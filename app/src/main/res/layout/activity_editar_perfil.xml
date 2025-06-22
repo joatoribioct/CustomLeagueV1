@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="10dp"
+    tools:context=".EditarPerfil">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:id="@+id/txt_Editar_perfil"
+            android:text="@string/txt_Editar_perfil"
+            android:gravity="center"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginTop="15dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+        <!-- IMAGEN DE PERFIL-->
+        <RelativeLayout
+            android:id="@+id/perfilRl"
+            android:layout_below="@+id/txt_Editar_perfil"
+            android:layout_marginTop="15dp"
+            android:layout_centerHorizontal="true"
+            android:layout_width="150dp"
+            android:layout_height="150dp">
+
+            <ImageView
+                android:id="@+id/img_Perfil"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:scaleType="centerCrop"
+                android:src="@drawable/img_perfil" />
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabCambiarImg"
+                android:layout_alignParentEnd="true"
+                app:fabSize="mini"
+                android:src="@drawable/ic_selecionar_imagen"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+        </RelativeLayout>
+        <!-- NOMBRES-->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilNombres"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/perfilRl"
+            android:layout_marginTop="10dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxCornerRadiusBottomEnd="8dp">
+
+            <EditText
+                android:id="@+id/et_Nombres"
+                android:hint="@string/et_Nombres"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"/>
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- ID GAMING - NUEVO CAMPO -->
+        <RelativeLayout
+            android:id="@+id/rl_IdGaming"
+            android:layout_below="@+id/tilNombres"
+            android:layout_marginTop="10dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilIdGaming"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_toStartOf="@+id/btnSugerencias"
+                android:layout_marginEnd="10dp"
+                app:boxCornerRadiusBottomStart="8dp"
+                app:boxCornerRadiusTopEnd="8dp"
+                app:boxCornerRadiusTopStart="8dp"
+                app:boxCornerRadiusBottomEnd="8dp"
+                app:helperText="Tu identificador único en la liga"
+                app:helperTextTextColor="#FF018786">
+
+                <EditText
+                    android:id="@+id/et_IdGaming"
+                    android:hint="ID de Consola"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textNoSuggestions"
+                    android:maxLength="20"
+                    android:textStyle="bold"
+                    android:textColor="#FF018786"/>
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSugerencias"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:icon="@drawable/ic_lightbulb"
+                app:iconSize="24dp"
+                app:iconPadding="0dp"
+                style="@style/Widget.Material3.Button.Icon"
+                android:contentDescription="Sugerencias de ID Gaming"
+                android:tooltipText="Generar sugerencias" />
+
+        </RelativeLayout>
+
+        <!-- FECHA NACIMIENTO-->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_Nacimiento"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/rl_IdGaming"
+            android:layout_marginTop="10dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxCornerRadiusBottomEnd="8dp">
+
+            <EditText
+                android:id="@+id/et_Fecha_Nacimiento"
+                android:hint="@string/et_Fecha_Nacimiento"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"/>
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <RelativeLayout
+            android:id="@+id/rl_Cod_Tel"
+            android:layout_below="@+id/til_Nacimiento"
+            android:layout_marginTop="10dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <com.hbb20.CountryCodePicker
+                android:id="@+id/selectorCod"
+                android:gravity="center"
+                app:ccp_autoDetectCountry="true"
+                app:ccp_rememberLastSelection="true"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_toEndOf="@+id/selectorCod"
+                android:layout_marginTop="10dp"
+                app:boxCornerRadiusBottomStart="8dp"
+                app:boxCornerRadiusTopEnd="8dp"
+                app:boxCornerRadiusTopStart="8dp"
+                app:boxCornerRadiusBottomEnd="8dp">
+
+                <EditText
+                    android:id="@+id/et_Telefono"
+                    android:hint="@string/et_Telefono"
+                    android:inputType="number"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"/>
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </RelativeLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_Actualizar"
+            android:text="@string/btn_Actualizar"
+            android:textAllCaps="true"
+            android:layout_centerInParent="true"
+            android:layout_below="@+id/rl_Cod_Tel"
+            android:layout_marginTop="15dp"
+            app:icon="@drawable/ic_editar"
+            android:layout_width="200dp"
+            android:layout_height="@dimen/m_button_heighet"/>
+
+    </RelativeLayout>
+
+</RelativeLayout>

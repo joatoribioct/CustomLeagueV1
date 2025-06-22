@@ -1,0 +1,75 @@
+<resources>
+    <string name="app_name">Custom League Beisbol</string>
+
+    <string name="item_Inicio">Inicio</string>
+    <string name="item_OrdenTurnos">Turnos</string>
+    <string name="item_selecionar">Seleccionar</string>
+    <string name="item_Mi_eqquipo">Mi Equipo</string>
+    <string name="item_Cuenta">Cuenta</string>
+
+    <string name="tituloRL">Titulo</string>
+
+    <string name="ingresarEmail">Ingresar con Email</string>
+    <string name="ingresarGoogle">Ingresar con Google</string>
+
+    <string name="txt_Login">Login de usuario</string>
+    <string name="et_Email">Email</string>
+    <string name="et_Password">Password</string>
+    <string name="btn_Ingresar">Ingresar</string>
+    <string name="txt_No_Cuenta">¿No tienes una cuenta?</string>
+    <string name="txt_Registrar">REGISTRARME</string>
+
+    <string name="txt_Registro">Registro de usuario</string>
+    <string name="et_R_Password">Repetir contraseña</string>
+    <string name="btn_Registrar">Registrar</string>
+
+    <!-- Perfil de usuario-->
+    <string name="txt_Perfil">Perfil de usuario</string>
+    <string name="txt_Informacion">Informacion: </string>
+    <string name="txt_Nombres">Nombres: </string>
+    <string name="tv_Nombres">Nombres completos</string>
+    <string name="txt_Email">Email: </string>
+    <string name="tv_Email">email@dominio.com</string>
+    <string name="txt_FechaNacimiento">Fecha de nacimiento: </string>
+    <string name="tv_FechaNacimiento">dd/mm/aaaa</string>
+    <string name="txt_Miembro">Miembro desde: </string>
+    <string name="tv_Miembro">dd/mm/aaaa</string>
+    <string name="txt_Telfono">Telefono: </string>
+    <string name="tv_Telfono">111111111 </string>
+    <string name="txt_Estado_Cuenta">Estado de cuenta: </string>
+    <string name="tv_Estado_Cuenta">No verificado </string>
+
+    <string name="txt_Opciones">Opciones</string>
+    <string name="btn_Editar_perfil">Editar perfil</string>
+    <string name="btn_Cerrar_Sesion">Cerrar Sesion</string>
+
+    <string name="txt_Editar_perfil">Editar perfil</string>
+    <string name="et_Nombres">Nombres Completos</string>"
+    <string name="et_Fecha_Nacimiento">Fecha de nacimiento</string>
+
+    <string name="cod_Telefono">00</string>
+    <string name="et_Telefono">Telefonos</string>
+    <string name="btn_Actualizar">Actualizar</string>
+
+    <!-- Crear Liga -->
+
+    <!-- Agregar estas líneas a tu archivo strings.xml existente -->
+    <string name="et_IdGaming">ID de Consola</string>
+    <string name="hint_id_gaming">Tu identificador único</string>
+    <string name="id_gaming_helper">Este será tu nombre visible en la liga</string>
+    <string name="btn_sugerencias">Sugerencias</string>
+    <string name="error_id_gaming_vacio">El ID Gaming es obligatorio</string>
+    <string name="error_id_gaming_corto">Mínimo 3 caracteres</string>
+    <string name="error_id_gaming_largo">Máximo 20 caracteres</string>
+    <string name="error_id_gaming_caracteres">Solo letras y números permitidos</string>
+    <string name="error_id_gaming_existente">Este ID Gaming ya está en uso</string>
+    <string name="id_gaming_actualizado">ID Gaming actualizado exitosamente</string>
+
+
+    <string name="default_web_client_id">265528413630-smoua589i5ch55kkkjsa3l783gf7bd9o.apps.googleusercontent.com</string>
+
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+
+</resources>

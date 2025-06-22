@@ -1,0 +1,68 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+# Built application files
+*.apk
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+
+# Log Files
+*.log
+
+# IntelliJ adicional
+.idea/dictionaries
+.idea/gradle.xml
+.idea/tasks.xml
+
+# Keystore files - IMPORTANTE para seguridad
+*.jks
+*.keystore
+
+# Google Services (Firebase) - MUY IMPORTANTE
+google-services.json
+
+# Freeline
+freeline.py
+freeline/
+freeline_project_description.json
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+fastlane/readme.md
+
+# Android Profiling
+*.hprof
+
+# NDK
+obj/
+
+# Windows
+Thumbs.db
+
+# Kotlin specific
+*.kt~

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="65dp"
+    android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="5dp">
+    
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/equiposIconosIv"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:src="@drawable/logo_colorad"/>
+
+    <TextView
+        android:id="@+id/tv_Equipos_Nombres"
+        android:text="Colorado"
+        android:textAlignment="center"
+        android:layout_marginTop="5dp"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+</androidx.appcompat.widget.LinearLayoutCompat>

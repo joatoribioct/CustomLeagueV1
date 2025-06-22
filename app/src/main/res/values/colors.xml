@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Colores principales del tema -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+
+    <!-- Colores adicionales para la aplicación -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Colores personalizados para ID Gaming -->
+    <color name="gaming_primary">#FF018786</color>
+    <color name="gaming_secondary">#FF03DAC5</color>
+    <color name="gaming_accent">#FF6200EE</color>
+
+    <!-- Colores para estados -->
+    <color name="success_green">#FF4CAF50</color>
+    <color name="warning_orange">#FFFF9800</color>
+    <color name="error_red">#FFF44336</color>
+
+    <!-- Colores para orden de turnos -->
+    <color name="gold">#FFD700</color>
+    <color name="silver">#C0C0C0</color>
+    <color name="bronze">#CD7F32</color>
+
+    <!-- Colores de fondo -->
+    <color name="background_light">#FFF5F5F5</color>
+    <color name="surface_light">#FFFFFFFF</color>
+    <color name="card_background">#FAFAFA</color>
+
+    <!-- Agrega estos colores a tu res/values/colors.xml -->
+    <color name="primary_color">#1976D2</color>
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="status_waiting">#FF9800</color>
+    <color name="status_active">#4CAF50</color>
+    <color name="status_my_turn">#F44336</color>
+    <color name="timer_color">#FF5722</color>
+    <color name="timer_background">#E0E0E0</color>
+    <color name="warning_color">#FF9800</color>
+    <color name="progress_background">#E3F2FD</color>
+
+    <!-- Colores para las rondas del draft -->
+    <color name="ronda_1">#4CAF50</color> <!-- Verde -->
+    <color name="ronda_2">#2196F3</color> <!-- Azul -->
+    <color name="ronda_3">#FF9800</color> <!-- Naranja -->
+    <color name="ronda_4">#9C27B0</color> <!-- Púrpura -->
+
+    <!-- Colores faltantes para el progreso del draft -->
+    <color name="background_color">#F5F5F5</color>
+    <color name="team_color">#1976D2</color>
+    <color name="status_admin">#FF9800</color>
+    <color name="whatsapp_green">#25D366</color>
+
+</resources>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="6dp"
+    android:background="@drawable/bg_item_normal"
+    android:layout_marginBottom="4dp">
+
+    <!-- Indicador de Ronda -->
+    <TextView
+        android:id="@+id/tvRondaPick"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="R1"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="@color/ronda_1"
+        android:background="@drawable/background_estado_seleccionado"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="2dp"
+        android:layout_marginEnd="8dp" />
+
+    <!-- Número de Pick -->
+    <TextView
+        android:id="@+id/tvNumeroPick"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Pick 1:"
+        android:textSize="12sp"
+        android:textColor="@color/text_secondary"
+        android:layout_marginEnd="4dp" />
+
+    <!-- Tipo de Lineup -->
+    <TextView
+        android:id="@+id/tvTipoLineup"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Infield"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary"
+        android:layout_marginEnd="4dp" />
+
+    <!-- Texto "de" -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="de"
+        android:textSize="12sp"
+        android:textColor="@color/text_secondary"
+        android:layout_marginEnd="4dp" />
+
+    <!-- Equipo -->
+    <TextView
+        android:id="@+id/tvEquipoPick"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Boston Red Sox"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="@color/team_color"
+        android:ellipsize="end"
+        android:maxLines="1" />
+
+</LinearLayout>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/item_Inicio"
+        android:title="@string/item_Inicio"
+        android:icon="@drawable/ic_inicio"/>
+
+    <item
+        android:id="@+id/item_OrdenTurnos"
+        android:title="@string/item_OrdenTurnos"
+        android:icon="@drawable/ic_ordern"/>
+
+    <item
+        android:id="@+id/item_selecionar"
+        android:title="Crear Liga"
+        android:enabled="false" />
+
+    <item
+        android:id="@+id/item_Mi_eqquipo"
+        android:title="@string/item_Mi_eqquipo"
+        android:icon="@drawable/ic_equipo"/>
+
+    <item
+        android:id="@+id/item_Cuenta"
+        android:title="@string/item_Cuenta"
+        android:icon="@drawable/ic_cuenta"/>
+</menu>

@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    tools:context=".Fragmentos.FragmentInicio">
+
+    <!-- Header Compacto de la Liga -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="12dp"
+        app:cardUseCompatPadding="true"
+        app:cardElevation="4dp"
+        android:layout_margin="6dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/gradient_header_background"
+            android:padding="12dp">
+
+            <!-- Nombre de la Liga - Más compacto -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_league_trophy"
+                    android:layout_marginEnd="8dp"
+                    app:tint="@color/white" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:text="Liga de Béisbol"
+                        android:textColor="@color/white"
+                        android:textSize="10sp"
+                        android:textStyle="normal"
+                        android:alpha="0.8"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+
+                    <TextView
+                        android:id="@+id/tvNombreReal"
+                        android:text="Cargando liga..."
+                        android:textColor="@color/white"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Estado del Draft - Compacto -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardEstadoDraft"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@color/white"
+                android:visibility="visible">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="10dp">
+
+                    <!-- Información del turno actual - Una sola línea -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="6dp">
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_person_draft"
+                            android:layout_marginEnd="6dp"
+                            app:tint="@color/primary_color" />
+
+                        <TextView
+                            android:id="@+id/tvUsuarioActual"
+                            android:text="Esperando información..."
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content" />
+
+                        <!-- Estado visual del turno -->
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <View
+                                android:id="@+id/indicadorEstado"
+                                android:layout_width="6dp"
+                                android:layout_height="6dp"
+                                android:background="@drawable/circle_indicator"
+                                android:backgroundTint="@color/status_waiting"
+                                android:layout_marginEnd="4dp" />
+
+                            <TextView
+                                android:id="@+id/tvEstadoDraft"
+                                android:text="Esperando"
+                                android:textSize="11sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/status_waiting"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                    <!-- Temporizador - Más compacto -->
+                    <LinearLayout
+                        android:id="@+id/layoutTemporizador"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="4dp">
+
+                            <ImageView
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:src="@drawable/ic_timer"
+                                android:layout_marginEnd="6dp"
+                                app:tint="@color/timer_color" />
+
+                            <TextView
+                                android:text="Tiempo:"
+                                android:textSize="12sp"
+                                android:textColor="@color/text_secondary"
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content" />
+
+                            <TextView
+                                android:id="@+id/tvTiempoRestante"
+                                android:text="3:00"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/timer_color"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content" />
+
+                        </LinearLayout>
+
+                        <!-- Barra de progreso del temporizador -->
+                        <ProgressBar
+                            android:id="@+id/progressTemporizador"
+                            style="?android:attr/progressBarStyleHorizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="4dp"
+                            android:max="180"
+                            android:progress="180"
+                            android:progressTint="@color/timer_color"
+                            android:progressBackgroundTint="@color/timer_background"
+                            android:layout_marginBottom="4dp" />
+
+                        <TextView
+                            android:text="⚠️ El sistema elegirá automáticamente"
+                            android:textSize="9sp"
+                            android:textColor="@color/warning_color"
+                            android:textStyle="italic"
+                            android:gravity="center"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Título de Equipos -->
+    <TextView
+        android:text="Equipos Disponibles"
+        style="@style/TextAppearance.MaterialComponents.Overline"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="4dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <!-- Lista de Equipos -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/equiposTodosRV"
+        tools:listitem="@layout/item_equipos_inicio"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+        android:layout_marginTop="4dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <!-- Título de Lineups -->
+    <TextView
+        android:text="Lineups del Equipo Seleccionado"
+        style="@style/TextAppearance.MaterialComponents.Overline"
+        android:textStyle="bold"
+        android:textSize="14sp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <Button
+        android:id="@+id/btnVerProgresoDraft"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:text="📊 Ver Progreso del Draft"
+        android:background="@color/primary_color"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:visibility="visible" />
+
+    <!-- Lista de Lineups -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvLinups"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        tools:listitem="@layout/item_linup_infield"
+        android:layout_marginTop="4dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="8dp"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"/>
+
+</androidx.appcompat.widget.LinearLayoutCompat>
