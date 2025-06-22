@@ -5,13 +5,11 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
-import android.os.CountDownTimer
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -26,9 +24,9 @@ import com.google.firebase.database.ValueEventListener
 import com.joatoribio.customleaguebeisbol.Adaptadores.AdaptadorEquipos
 import com.joatoribio.customleaguebeisbol.Adaptadores.LineupsAdapter
 import com.joatoribio.customleaguebeisbol.Constantes
-import com.joatoribio.customleaguebeisbol.Draft.TemporizadorGlobal
 import com.joatoribio.customleaguebeisbol.Draft.ControladorDraft
 import com.joatoribio.customleaguebeisbol.Draft.EstadoDraft
+import com.joatoribio.customleaguebeisbol.Draft.TemporizadorGlobal
 import com.joatoribio.customleaguebeisbol.Manager.EquiposManager
 import com.joatoribio.customleaguebeisbol.Modelo.LineupViewModel
 import com.joatoribio.customleaguebeisbol.Modelo.ModeloEquipos

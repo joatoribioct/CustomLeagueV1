@@ -15,9 +15,7 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.storage.FirebaseStorage
-import com.hbb20.CountryCodePicker
 import com.joatoribio.customleaguebeisbol.databinding.ActivityEditarPerfilBinding
-import java.util.*
 
 class EditarPerfil : AppCompatActivity() {
 

@@ -5,13 +5,9 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Patterns
 import android.widget.Toast
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.joatoribio.customleaguebeisbol.MainActivity
-import com.joatoribio.customleaguebeisbol.R
 import com.joatoribio.customleaguebeisbol.Registrar_email
 import com.joatoribio.customleaguebeisbol.databinding.ActivityLoginEmailBinding
 
