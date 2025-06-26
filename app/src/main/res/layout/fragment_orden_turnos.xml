@@ -113,6 +113,22 @@
 
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- NUEVO: Botón de Progreso del Draft -->
+            <Button
+                android:id="@+id/btnVerProgresoDraft"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:text="📊 Ver Progreso del Draft"
+                android:background="@color/primary_color"
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:padding="16dp"
+                app:cornerRadius="8dp"
+                style="@style/Widget.Material3.Button"
+                android:visibility="gone" />
+
             <!-- Lista de participantes -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"

@@ -31,7 +31,7 @@
     <color name="surface_light">#FFFFFFFF</color>
     <color name="card_background">#FAFAFA</color>
 
-    <!-- Agrega estos colores a tu res/values/colors.xml -->
+    <!-- Agrega estos colores a tu res/values/ -->
     <color name="primary_color">#1976D2</color>
     <color name="text_primary">#212121</color>
     <color name="text_secondary">#757575</color>

@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -48,11 +49,14 @@ class FragmentOrdenTurnos : Fragment() {
     private lateinit var btnGuardarOrden: FloatingActionButton
     private lateinit var btnResetearOrden: FloatingActionButton
 
-    // NUEVOS: Views para control de draft
+    // Views para control de draft
     private lateinit var tvEstadoDraft: TextView
     private lateinit var btnIniciarDraft: FloatingActionButton
     private lateinit var btnDetenerDraft: FloatingActionButton
     private lateinit var btnHabilitarLiga: FloatingActionButton
+
+    // NUEVO: Botón para ver progreso del draft
+    private lateinit var btnVerProgresoDraft: Button
 
     private var itemTouchHelper: ItemTouchHelper? = null
 
@@ -80,11 +84,14 @@ class FragmentOrdenTurnos : Fragment() {
         btnGuardarOrden = view.findViewById(R.id.btnGuardarOrden)
         btnResetearOrden = view.findViewById(R.id.btnResetearOrden)
 
-        // NUEVOS: Inicializar views de control de draft
+        // Inicializar views de control de draft
         tvEstadoDraft = view.findViewById(R.id.tvEstadoDraft)
         btnIniciarDraft = view.findViewById(R.id.btnIniciarDraft)
         btnDetenerDraft = view.findViewById(R.id.btnDetenerDraft)
         btnHabilitarLiga = view.findViewById(R.id.btnHabilitarLiga)
+
+        // NUEVO: Inicializar botón de progreso del draft
+        btnVerProgresoDraft = view.findViewById(R.id.btnVerProgresoDraft)
 
         return view
     }
@@ -97,20 +104,65 @@ class FragmentOrdenTurnos : Fragment() {
         inicializarAdaptador()
         configurarRecyclerView()
         configurarFuncionesAdmin()
+        configurarBotonProgresoDraft()
 
         cargarLigaDelUsuario()
     }
 
+    private fun configurarBotonProgresoDraft() {
+        btnVerProgresoDraft.setOnClickListener {
+            Log.d("NAVEGACION", "Navegando a progreso del draft desde OrdenTurnos")
+            navegarAProgresoDraft()
+        }
+
+        // Inicialmente oculto hasta verificar el estado del draft
+        btnVerProgresoDraft.visibility = View.GONE
+        Log.d("BOTON_PROGRESO", "Botón de progreso configurado en OrdenTurnos")
+    }
+
+    private fun navegarAProgresoDraft() {
+        try {
+            val fragmentManager = requireActivity().supportFragmentManager
+            val fragmentProgreso = FragmentProgresoDraft()
+
+            fragmentManager.beginTransaction()
+                .replace(R.id.fragmet_LayoutL1, fragmentProgreso)
+                .addToBackStack("ProgresoDraft")
+                .commitAllowingStateLoss()
+
+            Toast.makeText(mContexto, "Abriendo progreso del draft...", Toast.LENGTH_SHORT).show()
+            Log.d("NAVEGACION", "Navegación exitosa a FragmentProgresoDraft desde OrdenTurnos")
+
+        } catch (e: Exception) {
+            Log.e("NAVEGACION_ERROR", "Error al navegar a progreso: ${e.message}")
+            Toast.makeText(mContexto, "Error al abrir progreso del draft", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun actualizarVisibilidadBotonProgreso() {
+        try {
+            val mostrarBoton = ligaActual?.let { liga ->
+                val configuracionDraft = liga.configuracion.configuracionDraft
+                configuracionDraft.draftIniciado || configuracionDraft.draftCompletado ||
+                        (configuracionDraft.rondaActual > 1 || configuracionDraft.turnoActual > 0)
+            } ?: false
+
+            btnVerProgresoDraft.visibility = if (mostrarBoton) View.VISIBLE else View.GONE
+
+            Log.d("BOTON_PROGRESO", "Visibilidad botón en OrdenTurnos: ${if (mostrarBoton) "VISIBLE" else "GONE"}")
+
+        } catch (e: Exception) {
+            Log.w("BOTON_PROGRESO", "Error actualizando visibilidad en OrdenTurnos: ${e.message}")
+        }
+    }
+
     private fun configurarFuncionesAdmin() {
-        // Ocultar controles de admin por defecto
         panelAdmin.visibility = View.GONE
 
-        // NUEVOS: Ocultar controles de draft por defecto
         btnIniciarDraft.visibility = View.GONE
         btnDetenerDraft.visibility = View.GONE
         btnHabilitarLiga.visibility = View.GONE
 
-        // Configurar botones existentes
         btnGuardarOrden.setOnClickListener {
             guardarOrdenActual()
         }
@@ -119,7 +171,6 @@ class FragmentOrdenTurnos : Fragment() {
             resetearOrdenOriginal()
         }
 
-        // NUEVOS: Configurar botones de control de draft
         btnHabilitarLiga.setOnClickListener {
             habilitarLiga()
         }
@@ -133,9 +184,6 @@ class FragmentOrdenTurnos : Fragment() {
         }
     }
 
-    /**
-     * NUEVO: Habilita la liga cambiando el estado de "Configurando" a "Disponible"
-     */
     private fun habilitarLiga() {
         ligaActual?.let { liga ->
             val builder = AlertDialog.Builder(mContexto)
@@ -155,9 +203,6 @@ class FragmentOrdenTurnos : Fragment() {
         }
     }
 
-    /**
-     * NUEVO: Muestra diálogo para iniciar el draft
-     */
     private fun mostrarDialogoIniciarDraft() {
         ligaActual?.let { liga ->
             val configuracionDraft = liga.configuracion.configuracionDraft
@@ -166,9 +211,7 @@ class FragmentOrdenTurnos : Fragment() {
             val builder = AlertDialog.Builder(mContexto)
 
             if (esReanudacion) {
-                // Es una reanudación
                 builder.setTitle("🔄 Reanudar Draft")
-
                 val mensaje = """
                 ¿Deseas reanudar el draft desde donde se quedó?
                 
@@ -190,9 +233,7 @@ class FragmentOrdenTurnos : Fragment() {
                     iniciarDraft()
                 }
             } else {
-                // Es un inicio nuevo
                 builder.setTitle("🏆 Iniciar Draft")
-
                 val mensaje = """
                 ¿Estás listo para iniciar el draft?
                 
@@ -219,9 +260,6 @@ class FragmentOrdenTurnos : Fragment() {
         }
     }
 
-    /**
-     * MEJORADO: Muestra diálogo para detener el draft con información del estado
-     */
     private fun mostrarDialogoDetenerDraft() {
         ligaActual?.let { liga ->
             val configuracionDraft = liga.configuracion.configuracionDraft
@@ -259,9 +297,6 @@ class FragmentOrdenTurnos : Fragment() {
         }
     }
 
-    /**
-     * NUEVO: Cambia el estado de la liga
-     */
     private fun cambiarEstadoLiga(nuevoEstado: String) {
         ligaActual?.let { liga ->
             val database = FirebaseDatabase.getInstance()
@@ -270,7 +305,6 @@ class FragmentOrdenTurnos : Fragment() {
             ligaRef.child("estado").setValue(nuevoEstado)
                 .addOnSuccessListener {
                     Toast.makeText(mContexto, "Liga ${nuevoEstado.lowercase()}", Toast.LENGTH_SHORT).show()
-                    // Actualizar objeto local
                     ligaActual = liga.copy(estado = nuevoEstado)
                     actualizarUISegunEstado()
                 }
@@ -280,30 +314,24 @@ class FragmentOrdenTurnos : Fragment() {
         }
     }
 
-    /**
-     * CORREGIDO: Inicia el draft manteniendo el estado anterior o iniciando desde cero
-     */
     private fun iniciarDraft() {
         ligaActual?.let { liga ->
             val database = FirebaseDatabase.getInstance()
             val ligaRef = database.getReference("Ligas").child(liga.id)
 
-            // NUEVO: Verificar si había un estado previo del draft
             val configuracionDraft = liga.configuracion.configuracionDraft
 
             val updates = if (configuracionDraft.draftCompletado) {
-                // Si ya estaba completado, mostrar mensaje y no permitir reiniciar
                 Toast.makeText(mContexto, "⚠️ El draft ya está completado. No se puede reiniciar.", Toast.LENGTH_LONG).show()
                 return
             } else {
-                // CAMBIO PRINCIPAL: Mantener ronda y turno actuales si existían
                 val rondaActual = if (configuracionDraft.rondaActual > 0) {
                     configuracionDraft.rondaActual
                 } else {
-                    1 // Primera vez iniciando
+                    1
                 }
 
-                val turnoActual = configuracionDraft.turnoActual // Mantener turno actual
+                val turnoActual = configuracionDraft.turnoActual
 
                 Log.d("DRAFT_RESTART", "Reanudando draft desde: Ronda $rondaActual, Turno $turnoActual")
 
@@ -316,14 +344,13 @@ class FragmentOrdenTurnos : Fragment() {
                             if (configuracionDraft.fechaInicio > 0) configuracionDraft.fechaInicio
                             else System.currentTimeMillis()
                             ),
-                    "configuracion/configuracionDraft/fechaDetencion" to 0, // Limpiar fecha de detención
+                    "configuracion/configuracionDraft/fechaDetencion" to 0,
                     "estado" to "EnProgreso"
                 )
             }
 
             ligaRef.updateChildren(updates)
                 .addOnSuccessListener {
-                    // Mensaje diferente según si es reinicio o primera vez
                     val mensaje = if (configuracionDraft.rondaActual > 1 || configuracionDraft.turnoActual > 0) {
                         "🔄 Draft reanudado desde Ronda ${configuracionDraft.rondaActual}, Turno ${configuracionDraft.turnoActual + 1}"
                     } else {
@@ -331,8 +358,6 @@ class FragmentOrdenTurnos : Fragment() {
                     }
 
                     Toast.makeText(mContexto, mensaje, Toast.LENGTH_LONG).show()
-
-                    // Recargar datos para actualizar UI
                     cargarLigaDelUsuario()
                 }
                 .addOnFailureListener { error ->
@@ -341,20 +366,15 @@ class FragmentOrdenTurnos : Fragment() {
         }
     }
 
-    /**
-     * NUEVO: Detiene el draft
-     */
     private fun detenerDraft() {
         ligaActual?.let { liga ->
             val database = FirebaseDatabase.getInstance()
             val ligaRef = database.getReference("Ligas").child(liga.id)
 
-            // IMPORTANTE: Solo cambiar draftIniciado a false, mantener ronda y turno actuales
             val updates = mapOf(
                 "configuracion/configuracionDraft/draftIniciado" to false,
                 "configuracion/configuracionDraft/fechaDetencion" to System.currentTimeMillis(),
                 "estado" to "Disponible"
-                // NO tocar rondaActual ni turnoActual para mantener el progreso
             )
 
             ligaRef.updateChildren(updates)
@@ -402,8 +422,7 @@ class FragmentOrdenTurnos : Fragment() {
                     val usuario = usuariosParticipantes.removeAt(fromPosition)
                     usuariosParticipantes.add(toPosition, usuario)
                     adaptadorOrdenTurnos.notifyItemMoved(fromPosition, toPosition)
-
-                    Log.d("ORDEN_TURNOS", "Usuario movido de posición $fromPosition a $toPosition")
+                    actualizarNumerosOrden()
                 }
 
                 return true
@@ -422,9 +441,6 @@ class FragmentOrdenTurnos : Fragment() {
         itemTouchHelper?.attachToRecyclerView(rvOrdenTurnos)
     }
 
-    /**
-     * NUEVO: Verifica si se puede modificar el orden (solo si el draft no está activo)
-     */
     private fun puedeModificarOrden(): Boolean {
         return ligaActual?.configuracion?.configuracionDraft?.draftIniciado != true
     }
@@ -474,14 +490,12 @@ class FragmentOrdenTurnos : Fragment() {
         esAdmin = liga.adminUid == firebaseAuth.uid
         Log.d("ORDEN_TURNOS", "Usuario es admin: $esAdmin")
 
-        // NUEVO: Actualizar UI según el estado del draft
         actualizarUISegunEstado()
 
         tvNombreLiga.text = "🏆 ${liga.nombreLiga}"
         tvTotalParticipantes.text = "👥 ${liga.usuariosParticipantes.size}"
         tvEstadoLiga.text = "✅ ${liga.estado}"
 
-        // Configurar colores según el estado
         when (liga.estado) {
             "Disponible" -> {
                 tvEstadoLiga.setTextColor(mContexto.getColor(android.R.color.holo_green_dark))
@@ -505,9 +519,6 @@ class FragmentOrdenTurnos : Fragment() {
         rvOrdenTurnos.adapter = adaptadorOrdenTurnos
     }
 
-    /**
-     * NUEVO: Actualiza la UI según el estado de la liga y draft
-     */
     private fun actualizarUISegunEstado() {
         ligaActual?.let { liga ->
             val configuracionDraft = liga.configuracion.configuracionDraft
@@ -515,22 +526,18 @@ class FragmentOrdenTurnos : Fragment() {
             if (esAdmin) {
                 panelAdmin.visibility = View.VISIBLE
 
-                // Mostrar botones según el estado
                 when {
                     liga.estado == "Configurando" -> {
-                        // Liga en configuración - mostrar botón para habilitar
                         btnHabilitarLiga.visibility = View.VISIBLE
                         btnIniciarDraft.visibility = View.GONE
                         btnDetenerDraft.visibility = View.GONE
                         tvEstadoDraft.text = "⚙️ Liga en configuración - Presiona 'Habilitar Liga' cuando esté lista"
                     }
                     liga.estado == "Disponible" && !configuracionDraft.draftIniciado -> {
-                        // Liga disponible pero draft no iniciado/pausado
                         btnHabilitarLiga.visibility = View.GONE
                         btnIniciarDraft.visibility = View.VISIBLE
                         btnDetenerDraft.visibility = View.GONE
 
-                        // MEJORADO: Distinguir entre inicio y reanudación
                         val esReanudacion = configuracionDraft.rondaActual > 1 || configuracionDraft.turnoActual > 0
 
                         if (esReanudacion) {
@@ -542,17 +549,14 @@ class FragmentOrdenTurnos : Fragment() {
                         }
                     }
                     configuracionDraft.draftIniciado && !configuracionDraft.draftCompletado -> {
-                        // Draft en progreso
                         btnHabilitarLiga.visibility = View.GONE
                         btnIniciarDraft.visibility = View.GONE
                         btnDetenerDraft.visibility = View.VISIBLE
 
-                        // MEJORADO: Mostrar progreso detallado
                         val totalParticipantes = liga.usuariosParticipantes.size
                         tvEstadoDraft.text = "🏆 Draft activo - R${configuracionDraft.rondaActual}/4, T${configuracionDraft.turnoActual + 1}/$totalParticipantes"
                     }
                     configuracionDraft.draftCompletado -> {
-                        // Draft completado
                         btnHabilitarLiga.visibility = View.GONE
                         btnIniciarDraft.visibility = View.GONE
                         btnDetenerDraft.visibility = View.GONE
@@ -560,7 +564,6 @@ class FragmentOrdenTurnos : Fragment() {
                     }
                 }
             } else {
-                // Para participantes, solo mostrar información
                 panelAdmin.visibility = View.GONE
                 btnHabilitarLiga.visibility = View.GONE
                 btnIniciarDraft.visibility = View.GONE
@@ -588,6 +591,8 @@ class FragmentOrdenTurnos : Fragment() {
                     }
                 }
             }
+
+            actualizarVisibilidadBotonProgreso()
         }
     }
 
@@ -780,6 +785,9 @@ class FragmentOrdenTurnos : Fragment() {
 
         usuariosParticipantes.clear()
         adaptadorOrdenTurnos.notifyDataSetChanged()
+
+        // Ocultar botón de progreso cuando no hay liga
+        btnVerProgresoDraft.visibility = View.GONE
     }
 
     fun refrescarDatos() {
@@ -799,7 +807,6 @@ class FragmentOrdenTurnos : Fragment() {
             return
         }
 
-        // NUEVO: Verificar si se puede modificar el orden
         if (!puedeModificarOrden()) {
             Toast.makeText(mContexto, "No se puede modificar el orden mientras el draft está activo", Toast.LENGTH_LONG).show()
             return
@@ -856,7 +863,6 @@ class FragmentOrdenTurnos : Fragment() {
                     Toast.makeText(mContexto, "✅ Orden de draft guardado exitosamente", Toast.LENGTH_SHORT).show()
                     Log.d("ORDEN_TURNOS", "Orden guardado: ${usuariosParticipantes.map { "${it.nombre}${if(it.esAdmin) " (Admin)" else ""}" }}")
 
-                    // Actualizar UI después de guardar
                     actualizarUISegunEstado()
                 }
                 .addOnFailureListener { error ->
@@ -883,6 +889,11 @@ class FragmentOrdenTurnos : Fragment() {
         }
     }
 
+    private fun actualizarNumerosOrden() {
+        // El adaptador manejará automáticamente la numeración
+        adaptadorOrdenTurnos.notifyDataSetChanged()
+    }
+
     fun cambiarEstadoUsuario(posicion: Int) {
         if (!esAdmin || posicion >= usuariosParticipantes.size) return
 
@@ -898,9 +909,17 @@ class FragmentOrdenTurnos : Fragment() {
         val mensaje = if (usuario.uid == firebaseAuth.uid) {
             "Te has $estado para el draft"
         } else {
-            "${usuario.getIdentificadorMostrar()} $estado"
+            "${getIdentificadorMostrar(usuario)} $estado"
         }
 
         Toast.makeText(mContexto, mensaje, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun getIdentificadorMostrar(usuario: UsuarioParticipante): String {
+        return when {
+            usuario.idGaming.isNotEmpty() && usuario.idGaming != "null" -> usuario.idGaming
+            usuario.nombre.isNotEmpty() && usuario.nombre != "null" -> usuario.nombre
+            else -> "Usuario${usuario.uid.take(6)}"
+        }
     }
 }

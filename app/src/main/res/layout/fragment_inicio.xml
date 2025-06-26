@@ -243,16 +243,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 
-    <Button
-        android:id="@+id/btnVerProgresoDraft"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="8dp"
-        android:text="📊 Ver Progreso del Draft"
-        android:background="@color/primary_color"
-        android:textColor="@color/white"
-        android:textStyle="bold"
-        android:visibility="visible" />
+    <!-- REMOVIDO: btnVerProgresoDraft - Ya no está aquí -->
 
     <!-- Lista de Lineups -->
     <androidx.recyclerview.widget.RecyclerView

@@ -1,6 +1,5 @@
 package com.joatoribio.customleaguebeisbol.Fragmentos
 
-import android.app.AlertDialog
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -9,7 +8,6 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -99,58 +97,13 @@ class FragmentInicio : Fragment() {
         leerInfoDeUsuario()
         cargarEquipos()
         escucharLineupsSeleccionados()
-        configurarBotonProgresoDraft()
+        // REMOVIDO: configurarBotonProgresoDraft()
     }
 
-    // 2. AGREGAR ESTE MÉTODO NUEVO:
-    private fun configurarBotonProgresoDraft() {
-        val btnProgreso = view?.findViewById<Button>(R.id.btnVerProgresoDraft)
-
-        btnProgreso?.setOnClickListener {
-            Log.d("NAVEGACION", "Navegando a progreso del draft")
-            navegarAProgresoDraft()
-        }
-
-        Log.d("BOTON_PROGRESO", "Botón de progreso configurado")
-    }
-
-    // 3. AGREGAR ESTE MÉTODO NUEVO:
-    private fun navegarAProgresoDraft() {
-        try {
-            val fragmentManager = requireActivity().supportFragmentManager
-            val fragmentProgreso = FragmentProgresoDraft()
-
-            fragmentManager.beginTransaction()
-                .replace(R.id.fragmet_LayoutL1, fragmentProgreso)
-                .addToBackStack("ProgresoDraft")
-                .commitAllowingStateLoss()
-
-            Toast.makeText(mContexto, "Abriendo progreso del draft...", Toast.LENGTH_SHORT).show()
-            Log.d("NAVEGACION", "Navegación exitosa a FragmentProgresoDraft")
-
-        } catch (e: Exception) {
-            Log.e("NAVEGACION_ERROR", "Error al navegar a progreso: ${e.message}")
-            Toast.makeText(mContexto, "Error al abrir progreso del draft", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    // 4. AGREGAR ESTE MÉTODO NUEVO:
-    private fun actualizarVisibilidadBotonProgreso() {
-        try {
-            val btnProgreso = view?.findViewById<Button>(R.id.btnVerProgresoDraft)
-
-            // Mostrar botón solo cuando hay draft activo
-            val mostrarBoton = estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado
-
-            btnProgreso?.visibility = if (mostrarBoton) View.VISIBLE else View.GONE
-
-            Log.d("BOTON_PROGRESO", "Visibilidad botón: ${if (mostrarBoton) "VISIBLE" else "GONE"}")
-            Log.d("BOTON_PROGRESO", "Draft iniciado: ${estadoDraftActual.draftIniciado}, Draft completado: ${estadoDraftActual.draftCompletado}")
-
-        } catch (e: Exception) {
-            Log.w("BOTON_PROGRESO", "Error actualizando visibilidad: ${e.message}")
-        }
-    }
+    // REMOVIDOS: Todos los métodos relacionados con el botón de progreso
+    // - configurarBotonProgresoDraft()
+    // - navegarAProgresoDraft()
+    // - actualizarVisibilidadBotonProgreso()
 
     private fun leerInfoDeUsuario() {
         val ref = FirebaseDatabase.getInstance().getReference("Usuarios")
@@ -346,7 +299,7 @@ class FragmentInicio : Fragment() {
         } catch (e: Exception) {
             Log.w("DRAFT_FRAGMENT", "Error general: ${e.message}")
         }
-        actualizarVisibilidadBotonProgreso()
+        // REMOVIDO: actualizarVisibilidadBotonProgreso()
     }
 
 // SIMPLIFICAR iniciarTemporizadorGlobal() (ya no necesita toda la lógica):
@@ -1016,7 +969,7 @@ class FragmentInicio : Fragment() {
             "⏳ No es tu turno\n\n$infoTurno\n\nEspera tu turno para seleccionar."
         }
 
-        val builder = AlertDialog.Builder(mContexto, com.google.android.material.R.style.ThemeOverlay_Material3_Dialog_Alert)
+        val builder = androidx.appcompat.app.AlertDialog.Builder(mContexto, com.google.android.material.R.style.ThemeOverlay_Material3_Dialog_Alert)
         builder.setTitle("🚫 Selección Bloqueada")
         builder.setMessage(mensaje)
 
@@ -1037,7 +990,7 @@ class FragmentInicio : Fragment() {
         val miUsuarioId = firebaseAuth.uid ?: ""
         val infoTurno = controladorDraft?.obtenerInfoTurnoConPosicion(miUsuarioId) ?: "Draft no activo"
 
-        val builder = AlertDialog.Builder(mContexto, com.google.android.material.R.style.ThemeOverlay_Material3_Dialog_Alert)
+        val builder = androidx.appcompat.app.AlertDialog.Builder(mContexto, com.google.android.material.R.style.ThemeOverlay_Material3_Dialog_Alert)
         builder.setTitle("🎯 Confirmar Selección de Draft")
 
         val mensaje = """
@@ -1066,13 +1019,13 @@ class FragmentInicio : Fragment() {
         dialog.setCanceledOnTouchOutside(false)
         dialog.show()
 
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)?.apply {
             setTextColor(resources.getColor(android.R.color.holo_green_dark, null))
             textSize = 16f
             setPadding(16, 8, 16, 8)
         }
 
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)?.apply {
             setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
             textSize = 16f
             setPadding(16, 8, 16, 8)
