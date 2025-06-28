@@ -303,48 +303,45 @@ class FragmentInicio : Fragment() {
     }
 
 // SIMPLIFICAR iniciarTemporizadorGlobal() (ya no necesita toda la lógica):
-
     /**
-     * SIMPLIFICADO: Solo inicia temporizador, la verificación ya se hizo
-     */
+    * ACTUALIZADO: Iniciar temporizador ahora solo registra callbacks
+    */
     private fun iniciarTemporizadorGlobal() {
         val usuarioId = firebaseAuth.uid ?: ""
         val ligaId = ligaActual?.id ?: ""
         val rondaActual = estadoDraftActual.rondaActual
         val turnoActual = estadoDraftActual.turnoActual
 
-        Log.d("DEBUG_TEMPORIZADOR", "🚀 iniciarTemporizadorGlobal() para R$rondaActual-T$turnoActual")
+        Log.d("DEBUG_TEMPORIZADOR", "🚀 Registrando con temporizador del servidor")
 
-        binding.layoutTemporizador.visibility = View.VISIBLE
+        if (::binding.isInitialized) {
+            binding.layoutTemporizador.visibility = View.VISIBLE
+        }
 
-        // NUEVO: Pasar información de turno
-        TemporizadorGlobal.iniciarTemporizador(
-            usuarioId = usuarioId,
-            ligaId = ligaId,
-            ronda = rondaActual,      // NUEVO: Pasar ronda
-            turno = turnoActual,      // NUEVO: Pasar turno
+        // El temporizador del servidor ya está corriendo, solo registrar callbacks
+        TemporizadorGlobal.registrarCallbacks(
             onTick = { tiempoRestante ->
-                actualizarTemporizadorUI(tiempoRestante)
+                if (isAdded && ::binding.isInitialized) {
+                    actualizarTemporizadorUI(tiempoRestante)
+                }
             },
             onFinish = {
-                seleccionAutomatica()
+                if (isAdded) {
+                    mostrarMensajeSeleccionAutomatica()
+                }
             }
         )
     }
 // MEJORAR verificarYIniciarTemporizador() con más inteligencia:
 
     /**
-     * NUEVO: Verifica condiciones y fuerza inicio de temporizador si es necesario
-     */
-    /**
-     * SIMPLIFICADO: Verificación sin logs excesivos
+     * ACTUALIZADO: Verificar y iniciar temporizador sincronizado con servidor
      */
     private fun verificarYIniciarTemporizador() {
         val usuarioId = firebaseAuth.uid ?: ""
         val ligaId = ligaActual?.id ?: ""
         val puedeSeleccionar = controladorDraft?.puedeSeleccionar(usuarioId) ?: false
 
-        // NUEVO: Obtener información del turno actual
         val rondaActual = estadoDraftActual.rondaActual
         val turnoActual = estadoDraftActual.turnoActual
 
@@ -358,23 +355,55 @@ class FragmentInicio : Fragment() {
             return
         }
 
-        // NUEVO: Verificar con información de turno
-        val temporizadorActivo = TemporizadorGlobal.estaActivoPara(usuarioId, ligaId, rondaActual, turnoActual)
+        // NUEVO: Verificar estado del temporizador del servidor
+        TemporizadorGlobal.verificarEstadoServidor(ligaId) { activo, tiempoRestante ->
+            if (activo && tiempoRestante > 0) {
+                Log.d("DEBUG_TEMPORIZADOR", "✅ Temporizador del servidor activo: ${tiempoRestante}s restantes")
 
-        if (temporizadorActivo) {
-            Log.d("DEBUG_TEMPORIZADOR", "✅ Temporizador activo para este turno - Reconectando")
-            binding.layoutTemporizador.visibility = View.VISIBLE
-            TemporizadorGlobal.registrarCallbacks(
-                onTick = { tiempoRestante ->
-                    actualizarTemporizadorUI(tiempoRestante)
-                },
-                onFinish = {
-                    seleccionAutomatica()
+                // Conectar con el temporizador del servidor
+                TemporizadorGlobal.registrarCallbacks(
+                    onTick = { tiempoRestante ->
+                        if (isAdded && ::binding.isInitialized) {
+                            actualizarTemporizadorUI(tiempoRestante)
+                        }
+                    },
+                    onFinish = {
+                        if (isAdded) {
+                            mostrarMensajeSeleccionAutomatica()
+                        }
+                    }
+                )
+
+                if (::binding.isInitialized) {
+                    binding.layoutTemporizador.visibility = View.VISIBLE
                 }
-            )
-        } else {
-            Log.d("DEBUG_TEMPORIZADOR", "🆕 Temporizador NO activo para este turno - Iniciando NUEVO")
-            iniciarTemporizadorGlobal()
+            } else {
+                Log.d("DEBUG_TEMPORIZADOR", "❌ No hay temporizador activo del servidor")
+                ocultarTemporizador()
+            }
+        }
+    }
+
+    /**
+     * NUEVO: Mostrar mensaje cuando el servidor hace selección automática
+     */
+    private fun mostrarMensajeSeleccionAutomatica() {
+        try {
+            if (!isAdded || activity == null) return
+
+            Toast.makeText(
+                mContexto,
+                "⏰ Tiempo agotado! El sistema está realizando una selección automática...",
+                Toast.LENGTH_LONG
+            ).show()
+
+            // Ocultar temporizador
+            if (::binding.isInitialized) {
+                binding.layoutTemporizador.visibility = View.GONE
+            }
+
+        } catch (e: Exception) {
+            Log.w("SELECCION_AUTO", "Error mostrando mensaje: ${e.message}")
         }
     }
     /**
@@ -571,53 +600,6 @@ class FragmentInicio : Fragment() {
             Log.d("TEMPORIZADOR_UI", "UI actualizada: ${minutos}:${segundos.toString().padStart(2, '0')}")
         } catch (e: Exception) {
             Log.w("TEMPORIZADOR_UI", "Error actualizando UI temporizador: ${e.message}")
-        }
-    }
-
-
-    // REEMPLAZAR el método seleccionAutomatica:
-    /**
-     * NUEVO: Realiza una selección automática cuando se agota el tiempo
-     */
-    private fun seleccionAutomatica() {
-        try {
-            Log.d("SELECCION_AUTO", "Iniciando selección automática")
-
-            // Verificar que el fragmento esté activo
-            if (!isAdded || activity == null) {
-                Log.w("SELECCION_AUTO", "Fragmento no activo, cancelando selección automática")
-                return
-            }
-
-            // Buscar un lineup disponible
-            val lineupDisponible = buscarLineupDisponible()
-
-            if (lineupDisponible != null) {
-                Log.d("SELECCION_AUTO", "Lineup automático encontrado: ${lineupDisponible.first}")
-
-                Toast.makeText(
-                    mContexto,
-                    "⏰ Tiempo agotado! Selección automática: ${obtenerNombreTipo(lineupDisponible.first)}",
-                    Toast.LENGTH_LONG
-                ).show()
-
-                // Realizar selección automática
-                confirmarSeleccionDraft(
-                    lineupDisponible.third, // equipoId
-                    lineupDisponible.first, // tipo
-                    lineupDisponible.second // jugadores
-                )
-            } else {
-                Log.w("SELECCION_AUTO", "No se encontró lineup disponible")
-                Toast.makeText(mContexto, "⚠️ No hay lineups disponibles", Toast.LENGTH_SHORT).show()
-
-                // Avanzar turno sin selección
-                controladorDraft?.avanzarTurno()
-            }
-
-        } catch (e: Exception) {
-            Log.e("SELECCION_AUTO", "Error en selección automática: ${e.message}")
-            controladorDraft?.avanzarTurno()
         }
     }
 

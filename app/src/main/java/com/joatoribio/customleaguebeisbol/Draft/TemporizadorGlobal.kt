@@ -1,179 +1,255 @@
 package com.joatoribio.customleaguebeisbol.Draft
 
-import android.os.CountDownTimer
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
 /**
- * Temporizador global que persiste entre fragmentos
+ * ACTUALIZADO: Temporizador que se sincroniza con el servidor
+ * El temporizador del servidor es la fuente de verdad
  */
 object TemporizadorGlobal {
 
-    private var temporizador: CountDownTimer? = null
-    private var tiempoRestanteSegundos = 180
-    private var temporizadorActivo = false
-    private var usuarioActual = ""
-    private var ligaActual = ""
-
-    // NUEVO: Variables para detectar cambios de turno
-    private var rondaActual = -1
-    private var turnoActual = -1
-
-    // Callbacks para notificar a la UI
+    private var handler: Handler? = null
+    private var runnable: Runnable? = null
     private var onTickCallback: ((Int) -> Unit)? = null
     private var onFinishCallback: (() -> Unit)? = null
 
+    // Información del temporizador actual
+    private var usuarioActualId: String? = null
+    private var ligaActualId: String? = null
+    private var rondaActual: Int = 0
+    private var turnoActual: Int = 0
+
+    // Listener del servidor
+    private var serverTimerListener: ValueEventListener? = null
+
     /**
-     * Inicia el temporizador SOLO si es un usuario diferente
+     * NUEVO: Iniciar temporizador sincronizado con servidor
      */
     fun iniciarTemporizador(
         usuarioId: String,
         ligaId: String,
-        ronda: Int,           // NUEVO: Parámetro de ronda
-        turno: Int,           // NUEVO: Parámetro de turno
-        onTick: (tiempoRestante: Int) -> Unit,
+        ronda: Int,
+        turno: Int,
+        onTick: (Int) -> Unit,
         onFinish: () -> Unit
     ) {
-        Log.d("TEMPORIZADOR_GLOBAL", "🎯 SOLICITUD DE TEMPORIZADOR")
-        Log.d("TEMPORIZADOR_GLOBAL", "   - Usuario: $usuarioId")
-        Log.d("TEMPORIZADOR_GLOBAL", "   - Liga: $ligaId")
-        Log.d("TEMPORIZADOR_GLOBAL", "   - Ronda: $ronda, Turno: $turno")
-        Log.d("TEMPORIZADOR_GLOBAL", "   - Estado actual: Usuario=$usuarioActual, Ronda=$rondaActual, Turno=$turnoActual")
-        Log.d("TEMPORIZADOR_GLOBAL", "   - Temporizador activo: $temporizadorActivo")
+        Log.d("TEMPORIZADOR_GLOBAL", "🚀 Iniciando temporizador sincronizado con servidor")
+        Log.d("TEMPORIZADOR_GLOBAL", "Usuario: $usuarioId, Liga: $ligaId, R$ronda-T$turno")
 
-        // CLAVE: Reiniciar si cambió el turno (ronda o posición), NO solo el usuario
-        val esMismoTurno = (usuarioActual == usuarioId &&
-                ligaActual == ligaId &&
-                rondaActual == ronda &&
-                turnoActual == turno)
-
-        if (temporizadorActivo && esMismoTurno) {
-            Log.d("TEMPORIZADOR_GLOBAL", "✅ MISMO TURNO - Continuando temporizador")
-            Log.d("TEMPORIZADOR_GLOBAL", "   - Tiempo restante: $tiempoRestanteSegundos segundos")
-            onTickCallback = onTick
-            onFinishCallback = onFinish
-            onTick(tiempoRestanteSegundos)
-            return
-        }
-
-        // NUEVO TURNO - Reiniciar temporizador completo
-        Log.d("TEMPORIZADOR_GLOBAL", "🆕 NUEVO TURNO DETECTADO - Reiniciando temporizador a 3:00")
-        Log.d("TEMPORIZADOR_GLOBAL", "   - Turno anterior: Usuario=$usuarioActual, R$rondaActual-T$turnoActual")
-        Log.d("TEMPORIZADOR_GLOBAL", "   - Turno nuevo: Usuario=$usuarioId, R$ronda-T$turno")
-
+        // Detener temporizador anterior si existe
         detenerTemporizador()
 
-        // Configurar para nuevo turno
-        usuarioActual = usuarioId
-        ligaActual = ligaId
+        // Guardar información
+        usuarioActualId = usuarioId
+        ligaActualId = ligaId
         rondaActual = ronda
         turnoActual = turno
-        tiempoRestanteSegundos = 180 // SIEMPRE 3 minutos para nuevo turno
         onTickCallback = onTick
         onFinishCallback = onFinish
-        temporizadorActivo = true
 
-        temporizador = object : CountDownTimer((tiempoRestanteSegundos * 1000).toLong(), 1000) {
-            override fun onTick(millisUntilFinished: Long) {
-                if (!temporizadorActivo) {
-                    cancel()
+        // Inicializar handler
+        handler = Handler(Looper.getMainLooper())
+
+        // Sincronizar con el temporizador del servidor
+        sincronizarConServidor(ligaId)
+    }
+
+    /**
+     * NUEVO: Sincronizar con el temporizador del servidor
+     */
+    private fun sincronizarConServidor(ligaId: String) {
+        val temporizadorRef = FirebaseDatabase.getInstance()
+            .getReference("TemporizadoresDraft")
+            .child(ligaId)
+
+        serverTimerListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (!snapshot.exists()) {
+                    Log.d("TEMPORIZADOR_GLOBAL", "❌ No hay temporizador del servidor")
+                    onFinishCallback?.invoke()
                     return
                 }
 
-                tiempoRestanteSegundos = (millisUntilFinished / 1000).toInt()
-                onTickCallback?.invoke(tiempoRestanteSegundos)
+                val serverTimer = snapshot.value as? Map<String, Any> ?: return
+                val activo = serverTimer["activo"] as? Boolean ?: false
 
-                // Log cada 30 segundos
-                if (tiempoRestanteSegundos % 30 == 0) {
-                    Log.d("TEMPORIZADOR_GLOBAL", "⏰ R$rondaActual-T$turnoActual ($usuarioActual): $tiempoRestanteSegundos seg")
+                if (!activo) {
+                    Log.d("TEMPORIZADOR_GLOBAL", "⏹️ Temporizador del servidor desactivado")
+                    detenerTemporizador()
+                    return
+                }
+
+                val timestampVencimiento = (serverTimer["timestampVencimiento"] as? Long) ?: 0L
+                val rondaServidor = (serverTimer["ronda"] as? Long)?.toInt() ?: 0
+                val turnoServidor = (serverTimer["turno"] as? Long)?.toInt() ?: 0
+
+                // Verificar que corresponde al turno actual
+                if (rondaServidor != rondaActual || turnoServidor != turnoActual) {
+                    Log.d("TEMPORIZADOR_GLOBAL", "🔄 Turno cambió en servidor, deteniendo temporizador local")
+                    detenerTemporizador()
+                    return
+                }
+
+                val tiempoRestanteMs = timestampVencimiento - System.currentTimeMillis()
+                val tiempoRestanteSegundos = (tiempoRestanteMs / 1000).toInt()
+
+                Log.d("TEMPORIZADOR_GLOBAL", "⏰ Tiempo restante del servidor: ${tiempoRestanteSegundos}s")
+
+                if (tiempoRestanteSegundos <= 0) {
+                    Log.d("TEMPORIZADOR_GLOBAL", "⏰ Tiempo agotado según servidor")
+                    onFinishCallback?.invoke()
+                    detenerTemporizador()
+                } else {
+                    // Iniciar cuenta regresiva local sincronizada
+                    iniciarCuentaRegresivaLocal(tiempoRestanteSegundos)
                 }
             }
 
-            override fun onFinish() {
-                Log.d("TEMPORIZADOR_GLOBAL", "🏁 TEMPORIZADOR TERMINADO - R$rondaActual-T$turnoActual ($usuarioActual)")
-                temporizadorActivo = false
-                onFinishCallback?.invoke()
-                limpiar()
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("TEMPORIZADOR_GLOBAL", "Error sincronizando con servidor: ${error.message}")
             }
-        }.start()
+        }
 
-        Log.d("TEMPORIZADOR_GLOBAL", "🚀 TEMPORIZADOR INICIADO - 3:00 para R$ronda-T$turno ($usuarioId)")
+        temporizadorRef.addValueEventListener(serverTimerListener!!)
     }
 
     /**
-     * Detiene el temporizador (cuando usuario confirma selección)
+     * NUEVO: Iniciar cuenta regresiva local sincronizada con servidor
      */
-    fun detenerTemporizador() {
-        Log.d("TEMPORIZADOR_GLOBAL", "Deteniendo temporizador para usuario: $usuarioActual")
-        temporizadorActivo = false
-        temporizador?.cancel()
-        limpiar()
+    private fun iniciarCuentaRegresivaLocal(tiempoInicialSegundos: Int) {
+        // Detener runnable anterior si existe
+        runnable?.let { handler?.removeCallbacks(it) }
+
+        var tiempoRestante = tiempoInicialSegundos
+
+        runnable = object : Runnable {
+            override fun run() {
+                if (tiempoRestante <= 0) {
+                    Log.d("TEMPORIZADOR_GLOBAL", "⏰ Tiempo agotado en cliente")
+                    onFinishCallback?.invoke()
+                    detenerTemporizador()
+                    return
+                }
+
+                // Actualizar UI
+                onTickCallback?.invoke(tiempoRestante)
+
+                // Programar siguiente tick
+                tiempoRestante--
+                handler?.postDelayed(this, 1000)
+            }
+        }
+
+        // Iniciar inmediatamente
+        runnable?.let { handler?.post(it) }
     }
 
     /**
-     * Registra callbacks para UI (NO reinicia temporizador)
+     * Verificar si el temporizador está activo para un turno específico
+     */
+    fun estaActivoPara(usuarioId: String, ligaId: String, ronda: Int, turno: Int): Boolean {
+        return usuarioActualId == usuarioId &&
+                ligaActualId == ligaId &&
+                rondaActual == ronda &&
+                turnoActual == turno &&
+                handler != null
+    }
+
+    /**
+     * Registrar callbacks sin iniciar temporizador (para reconexión)
      */
     fun registrarCallbacks(
-        onTick: (tiempoRestante: Int) -> Unit,
+        onTick: (Int) -> Unit,
         onFinish: () -> Unit
     ) {
-        Log.d("TEMPORIZADOR_GLOBAL", "Registrando callbacks para UI")
         onTickCallback = onTick
         onFinishCallback = onFinish
 
-        // Si el temporizador está activo, notificar el tiempo actual
-        if (temporizadorActivo) {
-            onTick(tiempoRestanteSegundos)
-            Log.d("TEMPORIZADOR_GLOBAL", "Notificando tiempo actual: $tiempoRestanteSegundos segundos")
+        // Si hay un temporizador activo, reconectar con el servidor
+        ligaActualId?.let { ligaId ->
+            sincronizarConServidor(ligaId)
         }
     }
 
     /**
-     * Desregistra callbacks (cuando fragmento se destruye)
+     * Desregistrar callbacks (cuando el fragmento se oculta)
      */
     fun desregistrarCallbacks() {
-        Log.d("TEMPORIZADOR_GLOBAL", "Desregistrando callbacks UI")
         onTickCallback = null
         onFinishCallback = null
-        // NO detener el temporizador aquí
+
+        // No detener el temporizador, solo las callbacks
+        Log.d("TEMPORIZADOR_GLOBAL", "📱 Callbacks desregistrados")
     }
 
     /**
-     * Verifica si el temporizador está activo para un usuario específico
+     * Detener temporizador completamente
      */
-    fun estaActivoPara(usuarioId: String, ligaId: String, ronda: Int, turno: Int): Boolean {
-        val activo = (temporizadorActivo &&
-                usuarioActual == usuarioId &&
-                ligaActual == ligaId &&
-                rondaActual == ronda &&
-                turnoActual == turno)
-        Log.d("TEMPORIZADOR_GLOBAL", "¿Activo para $usuarioId R$ronda-T$turno? $activo")
-        return activo
-    }
+    fun detenerTemporizador() {
+        Log.d("TEMPORIZADOR_GLOBAL", "🛑 Deteniendo temporizador global")
 
-    /**
-     * Obtiene el tiempo restante actual
-     */
-    fun getTiempoRestante(): Int {
-        return if (temporizadorActivo) tiempoRestanteSegundos else 0
-    }
+        // Detener runnable local
+        runnable?.let { handler?.removeCallbacks(it) }
+        runnable = null
+        handler = null
 
-    /**
-     * Limpia las referencias
-     */
-    private fun limpiar() {
-        temporizador = null
-        usuarioActual = ""
-        ligaActual = ""
-        rondaActual = -1
-        turnoActual = -1
+        // Detener listener del servidor
+        serverTimerListener?.let { listener ->
+            ligaActualId?.let { ligaId ->
+                FirebaseDatabase.getInstance()
+                    .getReference("TemporizadoresDraft")
+                    .child(ligaId)
+                    .removeEventListener(listener)
+            }
+        }
+        serverTimerListener = null
+
+        // Limpiar callbacks
         onTickCallback = null
         onFinishCallback = null
+
+        // Limpiar información
+        usuarioActualId = null
+        ligaActualId = null
+        rondaActual = 0
+        turnoActual = 0
     }
 
     /**
-     * Verifica si hay un temporizador activo
+     * NUEVO: Verificar estado del temporizador del servidor
      */
-    fun estaActivo(): Boolean {
-        return temporizadorActivo
+    fun verificarEstadoServidor(ligaId: String, callback: (Boolean, Int) -> Unit) {
+        val temporizadorRef = FirebaseDatabase.getInstance()
+            .getReference("TemporizadoresDraft")
+            .child(ligaId)
+
+        temporizadorRef.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (!snapshot.exists()) {
+                    callback(false, 0)
+                    return
+                }
+
+                val serverTimer = snapshot.value as? Map<String, Any> ?: return
+                val activo = serverTimer["activo"] as? Boolean ?: false
+                val timestampVencimiento = (serverTimer["timestampVencimiento"] as? Long) ?: 0L
+
+                val tiempoRestanteMs = timestampVencimiento - System.currentTimeMillis()
+                val tiempoRestanteSegundos = (tiempoRestanteMs / 1000).toInt()
+
+                callback(activo, tiempoRestanteSegundos)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("TEMPORIZADOR_GLOBAL", "Error verificando estado servidor: ${error.message}")
+                callback(false, 0)
+            }
+        })
     }
 }

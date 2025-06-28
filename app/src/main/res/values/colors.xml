@@ -11,6 +11,18 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
+    <!-- NUEVOS: Colores para modo claro y oscuro -->
+    <color name="background_light">#FFF5F5F5</color>
+    <color name="background_dark">#FF121212</color>
+    <color name="surface_light">#FFFFFFFF</color>
+    <color name="surface_dark">#FF1E1E1E</color>
+
+    <!-- Colores de texto que se adaptan automáticamente -->
+    <color name="text_primary_light">#FF212121</color>
+    <color name="text_primary_dark">#FFFFFFFF</color>
+    <color name="text_secondary_light">#FF757575</color>
+    <color name="text_secondary_dark">#FFBBBBBB</color>
+
     <!-- Colores personalizados para ID Gaming -->
     <color name="gaming_primary">#FF018786</color>
     <color name="gaming_secondary">#FF03DAC5</color>
@@ -26,12 +38,10 @@
     <color name="silver">#C0C0C0</color>
     <color name="bronze">#CD7F32</color>
 
-    <!-- Colores de fondo -->
-    <color name="background_light">#FFF5F5F5</color>
-    <color name="surface_light">#FFFFFFFF</color>
+    <!-- Colores de fondo para cards -->
     <color name="card_background">#FAFAFA</color>
 
-    <!-- Agrega estos colores a tu res/values/ -->
+    <!-- Colores del sistema -->
     <color name="primary_color">#1976D2</color>
     <color name="text_primary">#212121</color>
     <color name="text_secondary">#757575</color>
@@ -49,10 +59,9 @@
     <color name="ronda_3">#FF9800</color> <!-- Naranja -->
     <color name="ronda_4">#9C27B0</color> <!-- Púrpura -->
 
-    <!-- Colores faltantes para el progreso del draft -->
+    <!-- Colores adicionales -->
     <color name="background_color">#F5F5F5</color>
     <color name="team_color">#1976D2</color>
     <color name="status_admin">#FF9800</color>
     <color name="whatsapp_green">#25D366</color>
-
 </resources>

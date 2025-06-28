@@ -1,7 +1,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.CustomLeagueBeisbol" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- CORREGIDO: Usar colores que SÍ existen en colors.xml -->
+        <!-- Colores para modo claro -->
         <item name="android:windowBackground">@color/background_light</item>
         <item name="colorPrimary">@color/purple_500</item>
         <item name="colorPrimaryVariant">@color/purple_700</item>
@@ -16,15 +16,46 @@
     <!-- Tema final de la aplicación -->
     <style name="Theme.CustomLeagueBeisbol" parent="Base.Theme.CustomLeagueBeisbol" />
 
-    <!-- Tema para la Splash Activity (CORREGIDO) -->
-    <style name="Theme.CustomLeagueBeisbol.Splash" parent="Theme.SplashScreen">
-        <!-- CORREGIDO: Usar colores que SÍ existen -->
-        <item name="windowSplashScreenBackground">@color/purple_500</item>
+    <!-- Tema para la Splash Activity - MODO CLARO -->
+    <style name="Theme.CustomLeagueBeisbol.Splash" parent="Theme.SplashScreen.IconBackground">
+        <!-- Fondo blanco para modo claro -->
+        <item name="windowSplashScreenBackground">@color/white</item>
 
-        <!-- CORREGIDO: Usar icono que existe o comentar si no existe -->
+        <!-- Icono del splash -->
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_leguebeisbol</item>
 
         <!-- Duración de la animación del icono -->
-        <item name="windowSplashScreenAnimationDuration">1000</item>
+        <item name="windowSplashScreenAnimationDuration">1500</item>
+
+        <!-- Color de fondo del icono -->
+        <item name="windowSplashScreenIconBackgroundColor">@color/white</item>
+
+        <!-- Colores para modo claro -->
+        <item name="android:statusBarColor">@color/white</item>
+        <item name="android:navigationBarColor">@color/white</item>
+
+        <!-- Para que la status bar tenga iconos oscuros en fondo claro -->
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+    </style>
+
+    <!-- ALTERNATIVA: Tema AppCompat para Splash si el anterior no funciona -->
+    <style name="Theme.CustomLeagueBeisbol.SplashCompat" parent="Base.Theme.CustomLeagueBeisbol">
+        <!-- Fondo blanco para modo claro -->
+        <item name="android:windowBackground">@color/white</item>
+
+        <!-- Sin action bar -->
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+
+        <!-- Pantalla completa -->
+        <item name="android:windowFullscreen">false</item>
+
+        <!-- Colores para modo claro -->
+        <item name="android:statusBarColor">@color/white</item>
+        <item name="android:navigationBarColor">@color/white</item>
+
+        <!-- Para que la status bar tenga iconos oscuros en fondo claro -->
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+
     </style>
 </resources>

@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="splash_screen_background_color">#FF000000</color> <!-- Negro -->
-    <color name="app_background_color">#FF000000</color> <!-- Negro -->
+    <!-- Colores que cambian en modo oscuro -->
+
+    <!-- Colores de fondo -->
+    <color name="background_light">#FF121212</color> <!-- Redefinido para modo oscuro -->
+    <color name="surface_light">#FF1E1E1E</color>    <!-- Redefinido para modo oscuro -->
+    <color name="card_background">#FF2D2D2D</color>   <!-- Cards más oscuras -->
+
+    <!-- Colores de texto -->
+    <color name="text_primary">#FFFFFFFF</color>     <!-- Texto principal blanco -->
+    <color name="text_secondary">#FFBBBBBB</color>   <!-- Texto secundario gris claro -->
+
+    <!-- Colores de background específicos para algunos elementos -->
+    <color name="progress_background">#FF1A237E</color>  <!-- Azul oscuro -->
+    <color name="timer_background">#FF424242</color>     <!-- Gris oscuro -->
+
+    <!-- Colores de sistema que se ven mejor en modo oscuro -->
+    <color name="primary_color">#FF2196F3</color>        <!-- Azul más claro -->
+
+    <!-- El resto de colores se mantienen iguales -->
+    <!-- Los colores de estado, gaming, etc. funcionan bien en ambos modos -->
 </resources>
