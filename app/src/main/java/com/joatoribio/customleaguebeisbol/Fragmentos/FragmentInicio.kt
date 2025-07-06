@@ -260,75 +260,24 @@ class FragmentInicio : Fragment() {
     }
 
     /**
-     * 🆕 CORREGIDO: Reconectar sin usar método privado
+     * ✏️ MODIFICADO: Reconectar usando verificación del servidor
      */
     private fun reconectarTemporizador() {
         try {
             val puedeSeleccionar = controladorDraft?.puedeSeleccionar(firebaseAuth.uid ?: "") ?: false
 
-            Log.d("TIMER_RECONNECT", "🔗 Reconectando temporizador - Puede seleccionar: $puedeSeleccionar")
+            Log.d("TIMER_RECONNECT", "🔗 Reconectando - Puede seleccionar: $puedeSeleccionar")
 
             if (puedeSeleccionar && estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado) {
-
                 val usuarioId = firebaseAuth.uid ?: ""
                 val ligaId = ligaActual?.id ?: ""
                 val rondaActual = estadoDraftActual.rondaActual
                 val turnoActual = estadoDraftActual.turnoActual
 
-                // Verificar si ya hay un temporizador activo para este turno
-                if (TemporizadorGlobal.estaActivoPara(usuarioId, ligaId, rondaActual, turnoActual)) {
-                    Log.d("TIMER_RECONNECT", "⚡ Temporizador ya activo, solo registrando callbacks")
+                Log.d("TIMER_RECONNECT", "✅ Verificando temporizador del servidor al reconectar")
 
-                    // Solo registrar callbacks
-                    TemporizadorGlobal.registrarCallbacks(
-                        onTick = { tiempoRestante ->
-                            if (isAdded && ::binding.isInitialized) {
-                                actualizarTemporizadorUI(tiempoRestante)
-                            }
-                        },
-                        onFinish = {
-                            if (isAdded) {
-                                mostrarMensajeSeleccionAutomatica()
-                                detenerTemporizadorUI()
-                            }
-                        }
-                    )
-
-                } else {
-                    Log.d("TIMER_RECONNECT", "🔍 Verificando estado del servidor...")
-
-                    // Usar el método público para verificar el servidor
-                    TemporizadorGlobal.verificarEstadoServidor(ligaId) { activo, tiempoRestante ->
-                        if (activo && tiempoRestante > 0) {
-                            Log.d("TIMER_RECONNECT", "✅ Servidor activo con ${tiempoRestante}s restantes")
-
-                            // Registrar callbacks
-                            TemporizadorGlobal.registrarCallbacks(
-                                onTick = { tiempo ->
-                                    if (isAdded && ::binding.isInitialized) {
-                                        actualizarTemporizadorUI(tiempo)
-                                    }
-                                },
-                                onFinish = {
-                                    if (isAdded) {
-                                        mostrarMensajeSeleccionAutomatica()
-                                        detenerTemporizadorUI()
-                                    }
-                                }
-                            )
-                        } else {
-                            Log.d("TIMER_RECONNECT", "❌ No hay temporizador activo en servidor")
-                            ocultarTemporizador()
-                        }
-                    }
-                }
-
-                // Mostrar UI del temporizador
-                if (::binding.isInitialized) {
-                    binding.layoutTemporizador.visibility = View.VISIBLE
-                }
-
-                Log.d("TIMER_RECONNECT", "✅ Proceso de reconexión completado")
+                // Usar la nueva verificación del servidor
+                verificarTemporizadorServidor(ligaId, usuarioId, rondaActual, turnoActual)
 
             } else {
                 Log.d("TIMER_RECONNECT", "❌ No es mi turno, ocultando temporizador")
@@ -336,7 +285,7 @@ class FragmentInicio : Fragment() {
             }
 
         } catch (e: Exception) {
-            Log.e("TIMER_RECONNECT", "Error reconectando temporizador: ${e.message}")
+            Log.e("TIMER_RECONNECT", "Error reconectando: ${e.message}")
         }
     }
 
@@ -410,34 +359,181 @@ class FragmentInicio : Fragment() {
 
         Log.d("TEMPORIZADOR", "🚀 Iniciando temporizador para mi turno")
 
-        if (::binding.isInitialized) {
-            binding.layoutTemporizador.visibility = View.VISIBLE
+        verificarTemporizadorServidor(ligaId, usuarioId, rondaActual, turnoActual)
+    }
 
-            // Configurar valores iniciales
-            binding.progressTemporizador.max = tiempoTotalSegundos
-            binding.progressTemporizador.progress = tiempoTotalSegundos
-        }
+    /**
+     * 🆕 NUEVO: Verificar estado del temporizador del servidor
+     */
+    private fun verificarTemporizadorServidor(ligaId: String, usuarioId: String, ronda: Int, turno: Int) {
+        val database = FirebaseDatabase.getInstance()
+        val temporizadorRef = database.getReference("TemporizadoresDraft").child(ligaId)
 
-        // Registrar con el servidor (para sincronización)
-        TemporizadorGlobal.iniciarTemporizador(
-            usuarioId = usuarioId,
-            ligaId = ligaId,
-            ronda = rondaActual,
-            turno = turnoActual,
-            onTick = { tiempoRestante ->
-                // Este callback puede ser ignorado porque usamos nuestro temporizador local
-            },
-            onFinish = {
-                if (isAdded) {
-                    mostrarMensajeSeleccionAutomatica()
-                    detenerTemporizadorUI()
+        Log.d("TEMPORIZADOR_CHECK", "🔍 Verificando temporizador del servidor...")
+
+        temporizadorRef.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    if (!snapshot.exists()) {
+                        Log.d("TEMPORIZADOR_CHECK", "❌ No hay temporizador en el servidor")
+                        ocultarTemporizador()
+                        return
+                    }
+
+                    val serverTimer = snapshot.value as? Map<String, Any> ?: return
+                    val activo = serverTimer["activo"] as? Boolean ?: false
+                    val usuarioEnTurno = serverTimer["usuarioEnTurno"] as? String ?: ""
+                    val rondaServidor = (serverTimer["ronda"] as? Long)?.toInt() ?: 0
+                    val turnoServidor = (serverTimer["turno"] as? Long)?.toInt() ?: 0
+
+                    Log.d("TEMPORIZADOR_CHECK", "📊 Estado servidor:")
+                    Log.d("TEMPORIZADOR_CHECK", "   - Activo: $activo")
+                    Log.d("TEMPORIZADOR_CHECK", "   - Usuario en turno: $usuarioEnTurno")
+                    Log.d("TEMPORIZADOR_CHECK", "   - Ronda/Turno servidor: $rondaServidor/$turnoServidor")
+                    Log.d("TEMPORIZADOR_CHECK", "   - Mi usuario: $usuarioId")
+
+                    if (!activo) {
+                        Log.d("TEMPORIZADOR_CHECK", "⏹️ Temporizador del servidor desactivado")
+                        ocultarTemporizador()
+                        return
+                    }
+
+                    // Verificar si es mi turno
+                    if (usuarioEnTurno != usuarioId) {
+                        Log.d("TEMPORIZADOR_CHECK", "⏸️ No es mi turno (es de: $usuarioEnTurno)")
+                        ocultarTemporizador()
+                        return
+                    }
+
+                    // Verificar que la ronda/turno coincida
+                    if (rondaServidor != ronda || turnoServidor != turno) {
+                        Log.d("TEMPORIZADOR_CHECK", "🔄 Ronda/turno cambió en servidor")
+                        ocultarTemporizador()
+                        return
+                    }
+
+                    // Calcular tiempo restante
+                    val timestampVencimiento = (serverTimer["timestampVencimiento"] as? Long) ?: 0L
+                    val tiempoRestanteMs = timestampVencimiento - System.currentTimeMillis()
+                    val tiempoRestanteSegundos = (tiempoRestanteMs / 1000).toInt()
+
+                    Log.d("TEMPORIZADOR_CHECK", "⏰ Tiempo restante: ${tiempoRestanteSegundos}s")
+
+                    if (tiempoRestanteSegundos <= 0) {
+                        Log.d("TEMPORIZADOR_CHECK", "⏰ Tiempo agotado")
+                        mostrarMensajeSeleccionAutomatica()
+                        ocultarTemporizador()
+                        return
+                    }
+
+                    // IMPORTANTE: Solo escuchar el servidor, NO crear temporizador local
+                    conectarConTemporizadorServidor(ligaId, tiempoRestanteSegundos)
+
+                } catch (e: Exception) {
+                    Log.e("TEMPORIZADOR_CHECK", "Error procesando datos del servidor: ${e.message}")
+                    ocultarTemporizador()
                 }
             }
-        )
 
-        // NUEVO: Iniciar temporizador visual local
-        iniciarTemporizadorUI()
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("TEMPORIZADOR_CHECK", "Error consultando servidor: ${error.message}")
+                ocultarTemporizador()
+            }
+        })
     }
+
+    /**
+     * 🆕 NUEVO: Conectar con temporizador del servidor existente
+     */
+    private fun conectarConTemporizadorServidor(ligaId: String, tiempoInicialRestante: Int) {
+        Log.d("TEMPORIZADOR_CONNECT", "🔗 Conectando con temporizador del servidor")
+
+        // Mostrar UI
+        if (::binding.isInitialized) {
+            binding.layoutTemporizador.visibility = View.VISIBLE
+            binding.progressTemporizador.max = tiempoTotalSegundos
+        }
+
+        // Iniciar temporizador UI local sincronizado con servidor
+        iniciarTemporizadorUISincronizado(tiempoInicialRestante)
+
+        // Escuchar cambios del servidor en tiempo real
+        val database = FirebaseDatabase.getInstance()
+        val temporizadorRef = database.getReference("TemporizadoresDraft").child(ligaId)
+
+        temporizadorRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    if (!snapshot.exists() || !isAdded) {
+                        return
+                    }
+
+                    val serverTimer = snapshot.value as? Map<String, Any> ?: return
+                    val activo = serverTimer["activo"] as? Boolean ?: false
+
+                    if (!activo) {
+                        Log.d("TEMPORIZADOR_CONNECT", "⏹️ Servidor desactivó temporizador")
+                        detenerTemporizadorUI()
+                        return
+                    }
+
+                    val timestampVencimiento = (serverTimer["timestampVencimiento"] as? Long) ?: 0L
+                    val tiempoRestanteMs = timestampVencimiento - System.currentTimeMillis()
+                    val tiempoRestanteSegundos = (tiempoRestanteMs / 1000).toInt()
+
+                    if (tiempoRestanteSegundos <= 0) {
+                        Log.d("TEMPORIZADOR_CONNECT", "⏰ Tiempo agotado según servidor")
+                        mostrarMensajeSeleccionAutomatica()
+                        detenerTemporizadorUI()
+                        return
+                    }
+
+                    // Actualizar UI con tiempo del servidor
+                    if (::binding.isInitialized) {
+                        actualizarTemporizadorUI(tiempoRestanteSegundos)
+                    }
+
+                } catch (e: Exception) {
+                    Log.e("TEMPORIZADOR_CONNECT", "Error procesando actualización: ${e.message}")
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("TEMPORIZADOR_CONNECT", "Error en listener del servidor: ${error.message}")
+            }
+        })
+
+        // Marcar como inicializado
+        temporizadorInicializado = true
+    }
+
+// 4. NUEVO MÉTODO: Temporizador UI sincronizado (sin lógica de negocio)
+
+    /**
+     * 🆕 NUEVO: Temporizador UI que solo muestra, no controla el tiempo
+     */
+    private fun iniciarTemporizadorUISincronizado(tiempoInicialSegundos: Int) {
+        // Detener temporizador UI anterior
+        temporizadorUI?.cancel()
+
+        Log.d("TEMPORIZADOR_UI", "🎬 Iniciando UI sincronizada con servidor (${tiempoInicialSegundos}s)")
+
+        // Este temporizador UI es solo visual, el servidor es la fuente de verdad
+        temporizadorUI = object : CountDownTimer((tiempoInicialSegundos * 1000).toLong(), 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                // El servidor maneja el tiempo real, esto es solo fallback visual
+            }
+
+            override fun onFinish() {
+                // El servidor maneja el tiempo real, esto es solo fallback visual
+                Log.d("TEMPORIZADOR_UI", "⏰ UI local terminado (fallback)")
+            }
+        }
+
+        temporizadorUI?.start()
+    }
+
+
 
     /**
      * NUEVO: Temporizador visual independiente que SÍ funciona
@@ -475,23 +571,24 @@ class FragmentInicio : Fragment() {
 // MEJORAR verificarYIniciarTemporizador() con más inteligencia:
 
     /**
-     * ACTUALIZADO: Verificar y iniciar temporizador si es mi turno
+     * ✏️ MODIFICADO: Solo verificar, nunca reiniciar temporizador
      */
     private fun verificarYIniciarTemporizador() {
         val usuarioId = firebaseAuth.uid ?: ""
-        val ligaId = ligaActual?.id ?: ""
         val puedeSeleccionar = controladorDraft?.puedeSeleccionar(usuarioId) ?: false
 
         Log.d("DEBUG_TEMPORIZADOR", "🔍 Verificando temporizador - Puede seleccionar: $puedeSeleccionar")
+        Log.d("DEBUG_TEMPORIZADOR", "🔍 Temporizador inicializado: $temporizadorInicializado")
 
         if (puedeSeleccionar) {
-            // Es mi turno - iniciar temporizador
             if (estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado) {
-                Log.d("DEBUG_TEMPORIZADOR", "🎯 ES MI TURNO - Iniciando temporizador")
-                iniciarTemporizadorGlobal()
+                Log.d("DEBUG_TEMPORIZADOR", "🎯 ES MI TURNO")
+
+                // CAMBIO CLAVE: Solo verificar servidor, nunca crear nuevo temporizador
+                Log.d("DEBUG_TEMPORIZADOR", "🔍 Verificando estado del servidor...")
+                reconectarTemporizador()
             }
         } else {
-            // No es mi turno - ocultar temporizador
             Log.d("DEBUG_TEMPORIZADOR", "⏸️ NO es mi turno - Ocultando temporizador")
             ocultarTemporizador()
         }
