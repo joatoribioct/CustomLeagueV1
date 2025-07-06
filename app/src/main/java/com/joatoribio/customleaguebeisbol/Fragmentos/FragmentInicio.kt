@@ -1,15 +1,23 @@
 package com.joatoribio.customleaguebeisbol.Fragmentos
 
+import android.animation.ObjectAnimator
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
+import android.os.CountDownTimer
+import android.os.Handler
+import android.os.Looper
+import android.os.VibrationEffect
 import android.util.Log
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
+import android.os.Vibrator
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -71,12 +79,19 @@ class FragmentInicio : Fragment() {
     private var lineupsListener: ValueEventListener? = null
     private var ligasListener: ValueEventListener? = null
 
+    private var temporizadorInicializado = false
+    private var esVisiblePorPrimeraVez = true
+    private var ultimaNavegacion = 0L
+
     // Variables para el temporizador - ACTUALIZADO
     private var tiempoRestanteSegundos = 180 // Solo para UI local
     private val TIEMPO_TOTAL_SEGUNDOS = 180
     private var ultimoUsuarioEnTurno = ""
     private var verificacionEnProceso = false // NUEVO: Evitar verificaciones simultáneas
     private var ultimaVerificacion = 0L // NUEVO: Timestamp de última verificación
+
+    private var temporizadorUI: CountDownTimer? = null
+    private var tiempoTotalSegundos = 180 // 3 minutos = 180 segundos
 
     override fun onAttach(context: Context) {
         mContexto = context
@@ -244,6 +259,87 @@ class FragmentInicio : Fragment() {
         controladorDraft?.iniciarEscuchaDraft()
     }
 
+    /**
+     * 🆕 CORREGIDO: Reconectar sin usar método privado
+     */
+    private fun reconectarTemporizador() {
+        try {
+            val puedeSeleccionar = controladorDraft?.puedeSeleccionar(firebaseAuth.uid ?: "") ?: false
+
+            Log.d("TIMER_RECONNECT", "🔗 Reconectando temporizador - Puede seleccionar: $puedeSeleccionar")
+
+            if (puedeSeleccionar && estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado) {
+
+                val usuarioId = firebaseAuth.uid ?: ""
+                val ligaId = ligaActual?.id ?: ""
+                val rondaActual = estadoDraftActual.rondaActual
+                val turnoActual = estadoDraftActual.turnoActual
+
+                // Verificar si ya hay un temporizador activo para este turno
+                if (TemporizadorGlobal.estaActivoPara(usuarioId, ligaId, rondaActual, turnoActual)) {
+                    Log.d("TIMER_RECONNECT", "⚡ Temporizador ya activo, solo registrando callbacks")
+
+                    // Solo registrar callbacks
+                    TemporizadorGlobal.registrarCallbacks(
+                        onTick = { tiempoRestante ->
+                            if (isAdded && ::binding.isInitialized) {
+                                actualizarTemporizadorUI(tiempoRestante)
+                            }
+                        },
+                        onFinish = {
+                            if (isAdded) {
+                                mostrarMensajeSeleccionAutomatica()
+                                detenerTemporizadorUI()
+                            }
+                        }
+                    )
+
+                } else {
+                    Log.d("TIMER_RECONNECT", "🔍 Verificando estado del servidor...")
+
+                    // Usar el método público para verificar el servidor
+                    TemporizadorGlobal.verificarEstadoServidor(ligaId) { activo, tiempoRestante ->
+                        if (activo && tiempoRestante > 0) {
+                            Log.d("TIMER_RECONNECT", "✅ Servidor activo con ${tiempoRestante}s restantes")
+
+                            // Registrar callbacks
+                            TemporizadorGlobal.registrarCallbacks(
+                                onTick = { tiempo ->
+                                    if (isAdded && ::binding.isInitialized) {
+                                        actualizarTemporizadorUI(tiempo)
+                                    }
+                                },
+                                onFinish = {
+                                    if (isAdded) {
+                                        mostrarMensajeSeleccionAutomatica()
+                                        detenerTemporizadorUI()
+                                    }
+                                }
+                            )
+                        } else {
+                            Log.d("TIMER_RECONNECT", "❌ No hay temporizador activo en servidor")
+                            ocultarTemporizador()
+                        }
+                    }
+                }
+
+                // Mostrar UI del temporizador
+                if (::binding.isInitialized) {
+                    binding.layoutTemporizador.visibility = View.VISIBLE
+                }
+
+                Log.d("TIMER_RECONNECT", "✅ Proceso de reconexión completado")
+
+            } else {
+                Log.d("TIMER_RECONNECT", "❌ No es mi turno, ocultando temporizador")
+                ocultarTemporizador()
+            }
+
+        } catch (e: Exception) {
+            Log.e("TIMER_RECONNECT", "Error reconectando temporizador: ${e.message}")
+        }
+    }
+
 
     /**
      * CORREGIDO: Actualiza la UI según el estado del draft mostrando ID Gaming
@@ -304,127 +400,119 @@ class FragmentInicio : Fragment() {
 
 // SIMPLIFICAR iniciarTemporizadorGlobal() (ya no necesita toda la lógica):
     /**
-    * ACTUALIZADO: Iniciar temporizador ahora solo registra callbacks
-    */
+     * CORREGIDO: Iniciar temporizador con conteo regresivo visual
+     */
     private fun iniciarTemporizadorGlobal() {
         val usuarioId = firebaseAuth.uid ?: ""
         val ligaId = ligaActual?.id ?: ""
         val rondaActual = estadoDraftActual.rondaActual
         val turnoActual = estadoDraftActual.turnoActual
 
-        Log.d("DEBUG_TEMPORIZADOR", "🚀 Registrando con temporizador del servidor")
+        Log.d("TEMPORIZADOR", "🚀 Iniciando temporizador para mi turno")
 
         if (::binding.isInitialized) {
             binding.layoutTemporizador.visibility = View.VISIBLE
+
+            // Configurar valores iniciales
+            binding.progressTemporizador.max = tiempoTotalSegundos
+            binding.progressTemporizador.progress = tiempoTotalSegundos
         }
 
-        // El temporizador del servidor ya está corriendo, solo registrar callbacks
-        TemporizadorGlobal.registrarCallbacks(
+        // Registrar con el servidor (para sincronización)
+        TemporizadorGlobal.iniciarTemporizador(
+            usuarioId = usuarioId,
+            ligaId = ligaId,
+            ronda = rondaActual,
+            turno = turnoActual,
             onTick = { tiempoRestante ->
-                if (isAdded && ::binding.isInitialized) {
-                    actualizarTemporizadorUI(tiempoRestante)
-                }
+                // Este callback puede ser ignorado porque usamos nuestro temporizador local
             },
             onFinish = {
                 if (isAdded) {
                     mostrarMensajeSeleccionAutomatica()
+                    detenerTemporizadorUI()
                 }
             }
         )
+
+        // NUEVO: Iniciar temporizador visual local
+        iniciarTemporizadorUI()
     }
+
+    /**
+     * NUEVO: Temporizador visual independiente que SÍ funciona
+     */
+    private fun iniciarTemporizadorUI() {
+        // Detener temporizador anterior si existe
+        temporizadorUI?.cancel()
+
+        Log.d("TEMPORIZADOR_UI", "🎬 Iniciando temporizador visual de ${tiempoTotalSegundos} segundos")
+
+        temporizadorUI = object : CountDownTimer((tiempoTotalSegundos * 1000).toLong(), 1000) {
+
+            override fun onTick(millisUntilFinished: Long) {
+                val segundosRestantes = (millisUntilFinished / 1000).toInt()
+
+                if (isAdded && ::binding.isInitialized) {
+                    actualizarTemporizadorUI(segundosRestantes)
+                }
+            }
+
+            override fun onFinish() {
+                Log.d("TEMPORIZADOR_UI", "⏰ Temporizador UI terminado")
+                if (isAdded) {
+                    // Mostrar tiempo agotado
+                    actualizarTemporizadorUI(0)
+                    // El callback del servidor se encargará de la selección automática
+                }
+            }
+        }
+
+        temporizadorUI?.start()
+    }
+
+
 // MEJORAR verificarYIniciarTemporizador() con más inteligencia:
 
     /**
-     * ACTUALIZADO: Verificar y iniciar temporizador sincronizado con servidor
+     * ACTUALIZADO: Verificar y iniciar temporizador si es mi turno
      */
     private fun verificarYIniciarTemporizador() {
         val usuarioId = firebaseAuth.uid ?: ""
         val ligaId = ligaActual?.id ?: ""
         val puedeSeleccionar = controladorDraft?.puedeSeleccionar(usuarioId) ?: false
 
-        val rondaActual = estadoDraftActual.rondaActual
-        val turnoActual = estadoDraftActual.turnoActual
+        Log.d("DEBUG_TEMPORIZADOR", "🔍 Verificando temporizador - Puede seleccionar: $puedeSeleccionar")
 
-        Log.d("DEBUG_TEMPORIZADOR", "🔍 verificarYIniciarTemporizador()")
-        Log.d("DEBUG_TEMPORIZADOR", "   - Usuario: $usuarioId")
-        Log.d("DEBUG_TEMPORIZADOR", "   - Puede seleccionar: $puedeSeleccionar")
-        Log.d("DEBUG_TEMPORIZADOR", "   - Ronda: $rondaActual, Turno: $turnoActual")
-
-        if (!puedeSeleccionar) {
-            Log.d("DEBUG_TEMPORIZADOR", "❌ No es mi turno")
-            return
-        }
-
-        // NUEVO: Verificar estado del temporizador del servidor
-        TemporizadorGlobal.verificarEstadoServidor(ligaId) { activo, tiempoRestante ->
-            if (activo && tiempoRestante > 0) {
-                Log.d("DEBUG_TEMPORIZADOR", "✅ Temporizador del servidor activo: ${tiempoRestante}s restantes")
-
-                // Conectar con el temporizador del servidor
-                TemporizadorGlobal.registrarCallbacks(
-                    onTick = { tiempoRestante ->
-                        if (isAdded && ::binding.isInitialized) {
-                            actualizarTemporizadorUI(tiempoRestante)
-                        }
-                    },
-                    onFinish = {
-                        if (isAdded) {
-                            mostrarMensajeSeleccionAutomatica()
-                        }
-                    }
-                )
-
-                if (::binding.isInitialized) {
-                    binding.layoutTemporizador.visibility = View.VISIBLE
-                }
-            } else {
-                Log.d("DEBUG_TEMPORIZADOR", "❌ No hay temporizador activo del servidor")
-                ocultarTemporizador()
+        if (puedeSeleccionar) {
+            // Es mi turno - iniciar temporizador
+            if (estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado) {
+                Log.d("DEBUG_TEMPORIZADOR", "🎯 ES MI TURNO - Iniciando temporizador")
+                iniciarTemporizadorGlobal()
             }
+        } else {
+            // No es mi turno - ocultar temporizador
+            Log.d("DEBUG_TEMPORIZADOR", "⏸️ NO es mi turno - Ocultando temporizador")
+            ocultarTemporizador()
         }
     }
 
     /**
-     * NUEVO: Mostrar mensaje cuando el servidor hace selección automática
-     */
-    private fun mostrarMensajeSeleccionAutomatica() {
-        try {
-            if (!isAdded || activity == null) return
-
-            Toast.makeText(
-                mContexto,
-                "⏰ Tiempo agotado! El sistema está realizando una selección automática...",
-                Toast.LENGTH_LONG
-            ).show()
-
-            // Ocultar temporizador
-            if (::binding.isInitialized) {
-                binding.layoutTemporizador.visibility = View.GONE
-            }
-
-        } catch (e: Exception) {
-            Log.w("SELECCION_AUTO", "Error mostrando mensaje: ${e.message}")
-        }
-    }
-    /**
-     * NUEVO: Detiene el temporizador global
+     * ACTUALIZADO: Detener temporizador completamente
      */
     private fun detenerTemporizadorGlobal() {
-        Log.d("TEMPORIZADOR", "Deteniendo temporizador global")
+        Log.d("TEMPORIZADOR", "🛑 Deteniendo temporizador global")
+        detenerTemporizadorUI()
         TemporizadorGlobal.detenerTemporizador()
-        try {
-            binding.layoutTemporizador.visibility = View.GONE
-        } catch (e: Exception) {
-            Log.w("TEMPORIZADOR", "Error ocultando temporizador UI: ${e.message}")
-        }
     }
+
 
     /**
      * NUEVO: Oculta el temporizador sin detenerlo (cuando no es mi turno)
      */
     private fun ocultarTemporizador() {
         try {
-            binding.layoutTemporizador.visibility = View.GONE
+            detenerTemporizadorUI()
             TemporizadorGlobal.desregistrarCallbacks()
         } catch (e: Exception) {
             Log.w("TEMPORIZADOR", "Error ocultando temporizador: ${e.message}")
@@ -523,6 +611,68 @@ class FragmentInicio : Fragment() {
     }
 
     /**
+     * NUEVO: Mostrar mensaje cuando se realiza selección automática
+     */
+    private fun mostrarMensajeSeleccionAutomatica() {
+        try {
+            Log.d("SELECCION_AUTO", "⚡ Mostrando mensaje de selección automática")
+
+            if (isAdded && ::binding.isInitialized) {
+                // Cambiar UI para mostrar que se está seleccionando automáticamente
+                binding.tvTiempoRestante.text = "0:00"
+                binding.progressTemporizador.progress = 0
+
+                // Mostrar mensaje
+                Toast.makeText(
+                    requireContext(),
+                    "⏱️ Tiempo agotado! El sistema está seleccionando automáticamente el mejor lineup disponible...",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                // Mostrar notificación en la UI
+                mostrarNotificacionSeleccionAutomatica()
+            }
+
+        } catch (e: Exception) {
+            Log.w("SELECCION_AUTO", "Error mostrando mensaje: ${e.message}")
+        }
+    }
+
+    /**
+     * NUEVO: Mostrar notificación visual de selección automática
+     */
+    private fun mostrarNotificacionSeleccionAutomatica() {
+        try {
+            if (::binding.isInitialized) {
+                // Crear un TextView temporal para la notificación
+                val notificacion = TextView(requireContext()).apply {
+                    text = "🤖 Selección automática en progreso..."
+                    setTextColor(Color.WHITE)
+                    setBackgroundColor(Color.parseColor("#FF9800"))
+                    textSize = 14f
+                    setPadding(16, 8, 16, 8)
+                    gravity = Gravity.CENTER
+                }
+
+                // Agregar al layout principal temporalmente
+                val parentLayout = binding.root as? ViewGroup
+                parentLayout?.addView(notificacion)
+
+                // Remover después de 3 segundos
+                Handler(Looper.getMainLooper()).postDelayed({
+                    try {
+                        parentLayout?.removeView(notificacion)
+                    } catch (e: Exception) {
+                        Log.w("SELECCION_AUTO", "Error removiendo notificación: ${e.message}")
+                    }
+                }, 3000)
+            }
+        } catch (e: Exception) {
+            Log.w("SELECCION_AUTO", "Error mostrando notificación: ${e.message}")
+        }
+    }
+
+    /**
      * NUEVO: Calcula cuántos usuarios faltan para el turno del usuario actual
      */
     private fun calcularPosicionEnCola(): Int {
@@ -570,38 +720,91 @@ class FragmentInicio : Fragment() {
     }
 
     /**
-     * NUEVO: Actualiza la UI del temporizador - SIMPLIFICADO
+     * ACTUALIZADO: Actualizar UI del temporizador con animaciones
      */
     private fun actualizarTemporizadorUI(tiempoRestanteSegundos: Int) {
         try {
-            // Verificar que el fragmento esté activo
-            if (!isAdded || activity == null || !::binding.isInitialized) {
+            if (!::binding.isInitialized) {
                 return
             }
 
             val minutos = tiempoRestanteSegundos / 60
             val segundos = tiempoRestanteSegundos % 60
 
+            // Actualizar texto del tiempo
             binding.tvTiempoRestante.text = String.format("%d:%02d", minutos, segundos)
+
+            // Actualizar barra de progreso
             binding.progressTemporizador.progress = tiempoRestanteSegundos
 
-            // Cambiar color cuando queda poco tiempo
-            val color = when {
-                tiempoRestanteSegundos <= 30 -> R.color.status_my_turn // Rojo
-                tiempoRestanteSegundos <= 60 -> R.color.warning_color  // Naranja
-                else -> R.color.timer_color // Azul normal
+            // Cambiar colores según el tiempo restante
+            val (colorTexto, colorProgreso) = when {
+                tiempoRestanteSegundos <= 30 -> Pair(R.color.red_urgent, R.color.red_urgent)
+                tiempoRestanteSegundos <= 60 -> Pair(R.color.orange_warning, R.color.orange_warning)
+                else -> Pair(R.color.blue_normal, R.color.blue_normal)
             }
 
-            binding.tvTiempoRestante.setTextColor(ContextCompat.getColor(requireContext(), color))
+            // Aplicar colores
+            binding.tvTiempoRestante.setTextColor(ContextCompat.getColor(requireContext(), colorTexto))
             binding.progressTemporizador.progressTintList = ColorStateList.valueOf(
-                ContextCompat.getColor(requireContext(), color)
+                ContextCompat.getColor(requireContext(), colorProgreso)
             )
 
-            Log.d("TEMPORIZADOR_UI", "UI actualizada: ${minutos}:${segundos.toString().padStart(2, '0')}")
+            // Animación de alerta cuando quedan pocos segundos
+            if (tiempoRestanteSegundos <= 30 && tiempoRestanteSegundos > 0) {
+                if (tiempoRestanteSegundos % 2 == 0) { // Parpadear cada 2 segundos
+                    animarAlerta()
+                }
+            }
+
+            Log.d("TEMPORIZADOR_UI", "⏰ UI actualizada: ${minutos}:${segundos.toString().padStart(2, '0')}")
+
         } catch (e: Exception) {
             Log.w("TEMPORIZADOR_UI", "Error actualizando UI temporizador: ${e.message}")
         }
     }
+
+    /**
+     * NUEVO: Animación de alerta para los últimos segundos
+     */
+    private fun animarAlerta() {
+        try {
+            if (::binding.isInitialized) {
+                val animation = ObjectAnimator.ofFloat(binding.tvTiempoRestante, "alpha", 1.0f, 0.3f, 1.0f)
+                animation.duration = 500
+                animation.start()
+
+                // Vibración suave (si está disponible)
+                val vibrator = requireContext().getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator?.vibrate(VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator?.vibrate(100)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("TEMPORIZADOR_UI", "Error en animación de alerta: ${e.message}")
+        }
+    }
+
+    /**
+     * NUEVO: Detener temporizador UI
+     */
+    private fun detenerTemporizadorUI() {
+        Log.d("TEMPORIZADOR_UI", "🛑 Deteniendo temporizador UI")
+        temporizadorUI?.cancel()
+        temporizadorUI = null
+
+        try {
+            if (::binding.isInitialized) {
+                binding.layoutTemporizador.visibility = View.GONE
+            }
+        } catch (e: Exception) {
+            Log.w("TEMPORIZADOR_UI", "Error ocultando temporizador UI: ${e.message}")
+        }
+    }
+
 
     /**
      * NUEVO: Busca un lineup disponible para selección automática
@@ -1094,44 +1297,99 @@ class FragmentInicio : Fragment() {
         sincronizarViewModelConFirebase()
     }
 
-    // REEMPLAZAR el método onDestroyView:
+    /**
+     * ✏️ MODIFICADO: onDestroyView mejorado
+     */
     override fun onDestroyView() {
         super.onDestroyView()
 
-        // NUEVO: Solo desregistrar callbacks, no detener el temporizador global
-        Log.d("FRAGMENT_LIFECYCLE", "FragmentInicio destruyéndose, desregistrando callbacks")
+        Log.d("FRAGMENT_LIFECYCLE", "💀 FragmentInicio - onDestroyView")
+
+        // Solo limpiar recursos locales, NO detener temporizador global
+        detenerTemporizadorUI()
         TemporizadorGlobal.desregistrarCallbacks()
 
         // Limpiar listeners de Firebase
         lineupsListener?.let {
             FirebaseDatabase.getInstance().getReference("LineupsSeleccionados").removeEventListener(it)
         }
-
         ligasListener?.let {
             FirebaseDatabase.getInstance().getReference("Ligas").removeEventListener(it)
         }
 
         controladorDraft = null
 
+        // IMPORTANTE: NO resetear temporizadorInicializado aquí
+        // Se resetea solo cuando el usuario hace una selección
+
         Log.d("FRAGMENT_LIFECYCLE", "FragmentInicio destruido, listeners limpiados")
     }
 
+    /**
+     * ✏️ MODIFICADO: onResume mejorado
+     */
     override fun onResume() {
         super.onResume()
+        Log.d("FRAGMENT_LIFECYCLE", "📱 FragmentInicio - onResume")
 
-        Log.d("FRAGMENT_LIFECYCLE", "📱 onResume()")
+        // NUEVO: Solo reconectar el temporizador si ya estaba inicializado
+        if (temporizadorInicializado && !esVisiblePorPrimeraVez) {
+            Log.d("FRAGMENT_LIFECYCLE", "🔄 Reconectando temporizador existente")
 
-        // NUEVO: Solo verificar si no hay verificación en proceso
-        if (!verificacionEnProceso) {
-            val usuarioId = firebaseAuth.uid ?: ""
-            val puedeSeleccionar = controladorDraft?.puedeSeleccionar(usuarioId) ?: false
+            // Pequeño delay para asegurar que la UI esté lista
+            Handler(Looper.getMainLooper()).postDelayed({
+                reconectarTemporizador()
+            }, 200)
 
-            if (puedeSeleccionar && estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado) {
-                Log.d("FRAGMENT_LIFECYCLE", "🔄 Verificando temporizador en onResume")
-                verificarYIniciarTemporizador()
-            }
         } else {
-            Log.d("FRAGMENT_LIFECYCLE", "⏳ Verificación en proceso - Saltando onResume")
+            Log.d("FRAGMENT_LIFECYCLE", "⏳ Primera vez visible o temporizador no inicializado")
+            esVisiblePorPrimeraVez = false
+        }
+    }
+    /**
+     * ✏️ MODIFICADO: onPause mejorado
+     */
+    override fun onPause() {
+        super.onPause()
+        Log.d("FRAGMENT_LIFECYCLE", "⏸️ FragmentInicio - onPause")
+
+        // IMPORTANTE: Solo desregistrar callbacks, NO detener el temporizador
+        TemporizadorGlobal.desregistrarCallbacks()
+
+        // Detener temporizador UI local (visual)
+        temporizadorUI?.cancel()
+    }
+
+    /**
+     * 🆕 NUEVO: Agregar onHiddenChanged para manejar show/hide
+     */
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
+        Log.d("FRAGMENT_LIFECYCLE", "👁️ FragmentInicio - Hidden: $hidden")
+
+        val tiempoActual = System.currentTimeMillis()
+
+        // Evitar navegaciones muy rápidas
+        if (tiempoActual - ultimaNavegacion < 500) {
+            Log.d("FRAGMENT_LIFECYCLE", "⏭️ Navegación muy rápida, ignorando")
+            return
+        }
+        ultimaNavegacion = tiempoActual
+
+        if (!hidden) {
+            // Fragment se vuelve visible
+            Log.d("FRAGMENT_LIFECYCLE", "👀 Fragment visible - Reconectando temporizador")
+
+            // Pequeño delay para asegurar transición
+            Handler(Looper.getMainLooper()).postDelayed({
+                reconectarTemporizador()
+            }, 300)
+
+        } else {
+            // Fragment se oculta
+            Log.d("FRAGMENT_LIFECYCLE", "🙈 Fragment oculto - Desregistrando callbacks")
+            TemporizadorGlobal.desregistrarCallbacks()
+            temporizadorUI?.cancel()
         }
     }
 

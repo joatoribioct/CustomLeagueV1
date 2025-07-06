@@ -26,6 +26,8 @@ class FragmentMiEquipo : Fragment() {
     private val lineupViewModel: LineupViewModel by activityViewModels()
     private lateinit var firebaseAuth: FirebaseAuth
 
+
+
     // Adaptador para mostrar los lineups
     private lateinit var miEquipoAdapter: MiEquipoAdapter
 

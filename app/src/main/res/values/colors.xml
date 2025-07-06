@@ -44,13 +44,8 @@
     <!-- Colores del sistema -->
     <color name="primary_color">#1976D2</color>
     <color name="text_primary">#212121</color>
-    <color name="text_secondary">#757575</color>
     <color name="status_waiting">#FF9800</color>
     <color name="status_active">#4CAF50</color>
-    <color name="status_my_turn">#F44336</color>
-    <color name="timer_color">#FF5722</color>
-    <color name="timer_background">#E0E0E0</color>
-    <color name="warning_color">#FF9800</color>
     <color name="progress_background">#E3F2FD</color>
 
     <!-- Colores para las rondas del draft -->
@@ -64,4 +59,20 @@
     <color name="team_color">#1976D2</color>
     <color name="status_admin">#FF9800</color>
     <color name="whatsapp_green">#25D366</color>
+
+    <!-- NUEVOS: Colores para el temporizador -->
+    <color name="red_urgent">#F44336</color>
+    <color name="orange_warning">#FF9800</color>
+    <color name="blue_normal">#2196F3</color>
+
+    <!-- Colores adicionales para el sistema -->
+    <color name="timer_color">#2196F3</color>
+    <color name="timer_background">#E0E0E0</color>
+    <color name="warning_color">#FF9800</color>
+    <color name="status_my_turn">#F44336</color>
+
+    <!-- Para las notificaciones -->
+    <color name="auto_selection_bg">#FF9800</color>
+    <color name="success_color">#4CAF50</color>
+    <color name="text_secondary">#757575</color>
 </resources>
