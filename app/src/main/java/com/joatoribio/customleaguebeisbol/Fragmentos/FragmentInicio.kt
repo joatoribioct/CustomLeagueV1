@@ -291,7 +291,7 @@ class FragmentInicio : Fragment() {
 
 
     /**
-     * CORREGIDO: Actualiza la UI según el estado del draft mostrando ID Gaming
+     * MODIFICADO: Simplificar la actualización de UI para evitar bucles
      */
     private fun actualizarUISegunEstadoDraft() {
         val puedeSeleccionar = controladorDraft?.puedeSeleccionar(firebaseAuth.uid ?: "") ?: false
@@ -300,52 +300,39 @@ class FragmentInicio : Fragment() {
 
         try {
             if (::binding.isInitialized) {
-                // CORREGIDO: Obtener ID Gaming del usuario actual en turno
                 val usuarioActual = controladorDraft?.obtenerInfoUsuarioActual() ?: "Esperando..."
 
-                Log.d("UI_UPDATE", "Usuario actual en turno (ID Gaming): $usuarioActual")
+                // Mostrar información del usuario actual
+                binding.tvUsuarioActual.text = if (usuarioActual == "Esperando...") {
+                    "Esperando inicio..."
+                } else {
+                    "Turno: $usuarioActual"
+                }
 
-                try {
-                    // MOSTRAR ID GAMING en lugar del UID
-                    binding.tvUsuarioActual.text = if (usuarioActual == "Esperando...") {
-                        "Esperando inicio..."
-                    } else {
-                        "Turno: $usuarioActual"
+                actualizarEstadoVisual(puedeSeleccionar)
+
+                // SIMPLIFICADO: Solo manejar visibilidad del card y llamar a verificar UNA VEZ
+                if (estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado) {
+                    binding.cardEstadoDraft.visibility = View.VISIBLE
+
+                    if (puedeSeleccionar && !temporizadorInicializado) {
+                        Log.d("DEBUG_TEMPORIZADOR", "🎯 ES MI TURNO - Verificación ÚNICA")
+                        // LLAMAR SOLO UNA VEZ para evitar bucles
+                        verificarYIniciarTemporizador()
+                    } else if (!puedeSeleccionar) {
+                        Log.d("DEBUG_TEMPORIZADOR", "⏸️ NO es mi turno - Ocultando")
+                        ocultarTemporizador()
                     }
-
-                    actualizarEstadoVisual(puedeSeleccionar)
-
-                    // Manejar temporizador
-                    if (estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado) {
-                        binding.cardEstadoDraft.visibility = View.VISIBLE
-
-                        if (puedeSeleccionar) {
-                            // Solo verificar si no hay verificación en proceso
-                            if (!verificacionEnProceso) {
-                                Log.d("DEBUG_TEMPORIZADOR", "🎯 ES MI TURNO - Verificación normal")
-                                verificarYIniciarTemporizador()
-                            } else {
-                                Log.d("DEBUG_TEMPORIZADOR", "⏳ Verificación en proceso - Saltando")
-                            }
-                        } else {
-                            Log.d("DEBUG_TEMPORIZADOR", "⏸️ NO es mi turno - Ocultando")
-                            ocultarTemporizador()
-                        }
-                    } else {
-                        binding.cardEstadoDraft.visibility = View.GONE
-                        detenerTemporizadorGlobal()
-                    }
-
-                } catch (e: Exception) {
-                    Log.w("DRAFT_FRAGMENT", "Error layout: ${e.message}")
-                    actualizarUIFallback(puedeSeleccionar)
+                } else {
+                    binding.cardEstadoDraft.visibility = View.GONE
+                    detenerTemporizadorGlobal()
                 }
             }
         } catch (e: Exception) {
-            Log.w("DRAFT_FRAGMENT", "Error general: ${e.message}")
+            Log.w("DRAFT_FRAGMENT", "Error en actualización UI: ${e.message}")
         }
-        // REMOVIDO: actualizarVisibilidadBotonProgreso()
     }
+
 
 // SIMPLIFICAR iniciarTemporizadorGlobal() (ya no necesita toda la lógica):
     /**
@@ -603,7 +590,6 @@ class FragmentInicio : Fragment() {
             }
     }
 
-    // ✅ MODIFICAR la función verificarYIniciarTemporizador() existente:
     private fun verificarYIniciarTemporizador() {
         val usuarioId = firebaseAuth.uid ?: ""
         val puedeSeleccionar = controladorDraft?.puedeSeleccionar(usuarioId) ?: false
@@ -611,20 +597,137 @@ class FragmentInicio : Fragment() {
         Log.d("DEBUG_TEMPORIZADOR", "🔍 Verificando temporizador - Puede seleccionar: $puedeSeleccionar")
         Log.d("DEBUG_TEMPORIZADOR", "🔍 Temporizador inicializado: $temporizadorInicializado")
 
-        if (puedeSeleccionar) {
-            if (estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado) {
-                Log.d("DEBUG_TEMPORIZADOR", "🎯 ES MI TURNO")
+        if (puedeSeleccionar && estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado) {
+            Log.d("DEBUG_TEMPORIZADOR", "🎯 ES MI TURNO")
 
-                // ✅ AGREGAR esta línea:
-                crearTemporizadorServidor()
+            // CORREGIDO: En lugar del bucle, verificar si el temporizador ya está funcionando
+            if (!temporizadorInicializado) {
+                Log.d("DEBUG_TEMPORIZADOR", "🚀 Iniciando temporizador directamente")
 
-                Log.d("DEBUG_TEMPORIZADOR", "🔍 Verificando estado del servidor...")
-                reconectarTemporizador()
+                // Mostrar el layout del temporizador inmediatamente
+                try {
+                    if (::binding.isInitialized) {
+                        binding.layoutTemporizador.visibility = View.VISIBLE
+                        // Inicializar con tiempo completo
+                        actualizarTemporizadorUI(tiempoTotalSegundos)
+                    }
+                } catch (e: Exception) {
+                    Log.e("DEBUG_TEMPORIZADOR", "Error mostrando layout: ${e.message}")
+                }
+
+                // Iniciar temporizador UI directamente
+                iniciarTemporizadorUIDirecto()
+
+                // Intentar sincronizar con servidor (sin bloquear la UI)
+                sincronizarConServidorEnSegundoPlano()
+
+                temporizadorInicializado = true
+            } else {
+                Log.d("DEBUG_TEMPORIZADOR", "✅ Temporizador ya inicializado")
             }
         } else {
             Log.d("DEBUG_TEMPORIZADOR", "⏸️ NO es mi turno - Ocultando temporizador")
             ocultarTemporizador()
         }
+    }
+
+
+    /**
+     * NUEVO: Iniciar temporizador UI directamente sin esperar al servidor
+     */
+    private fun iniciarTemporizadorUIDirecto() {
+        // Detener temporizador anterior si existe
+        temporizadorUI?.cancel()
+
+        Log.d("TEMPORIZADOR_UI", "🎬 Iniciando temporizador UI directo de ${tiempoTotalSegundos} segundos")
+
+        temporizadorUI = object : CountDownTimer((tiempoTotalSegundos * 1000).toLong(), 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                val segundosRestantes = (millisUntilFinished / 1000).toInt()
+
+                if (isAdded && ::binding.isInitialized) {
+                    actualizarTemporizadorUI(segundosRestantes)
+                }
+            }
+
+            override fun onFinish() {
+                Log.d("TEMPORIZADOR_UI", "⏰ Temporizador UI terminado")
+                if (isAdded) {
+                    actualizarTemporizadorUI(0)
+                    manejarTiempoAgotado()
+                }
+            }
+        }
+
+        temporizadorUI?.start()
+    }
+
+    /**
+     * NUEVO: Sincronizar con servidor en segundo plano (sin bloquear UI)
+     */
+    private fun sincronizarConServidorEnSegundoPlano() {
+        val ligaId = ligaActual?.id ?: return
+        val usuarioId = firebaseAuth.uid ?: return
+
+        Log.d("TEMPORIZADOR_SYNC", "🔄 Sincronizando con servidor en segundo plano")
+
+        val temporizadorRef = FirebaseDatabase.getInstance()
+            .getReference("TemporizadoresDraft")
+            .child(ligaId)
+
+        // Escuchar cambios del servidor sin detener el temporizador local
+        temporizadorRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    if (!snapshot.exists()) {
+                        Log.d("TEMPORIZADOR_SYNC", "ℹ️ No hay temporizador del servidor")
+                        return
+                    }
+
+                    val serverTimer = snapshot.value as? Map<String, Any> ?: return
+                    val activo = serverTimer["activo"] as? Boolean ?: false
+
+                    if (!activo) {
+                        Log.d("TEMPORIZADOR_SYNC", "⏹️ Servidor desactivó temporizador")
+                        return
+                    }
+
+                    val timestampVencimiento = (serverTimer["timestampVencimiento"] as? Long) ?: 0L
+                    val tiempoRestanteMs = timestampVencimiento - System.currentTimeMillis()
+                    val tiempoRestanteSegundos = (tiempoRestanteMs / 1000).toInt()
+
+                    Log.d("TEMPORIZADOR_SYNC", "⏰ Servidor dice: ${tiempoRestanteSegundos}s restantes")
+
+                    // Si el servidor dice que el tiempo se agotó, manejar inmediatamente
+                    if (tiempoRestanteSegundos <= 0) {
+                        Log.d("TEMPORIZADOR_SYNC", "⏰ Tiempo agotado según servidor")
+                        temporizadorUI?.cancel()
+                        if (isAdded && ::binding.isInitialized) {
+                            actualizarTemporizadorUI(0)
+                            manejarTiempoAgotado()
+                        }
+                    }
+
+                    // OPCIONAL: Ajustar temporizador local si hay mucha diferencia con el servidor
+                    // (Puedes comentar esto si prefieres que el local funcione independientemente)
+                    /*
+                    val diferencia = Math.abs(tiempoRestanteSegundos - segundosRestantesActuales)
+                    if (diferencia > 5) { // Solo si hay más de 5 segundos de diferencia
+                        Log.d("TEMPORIZADOR_SYNC", "🔄 Ajustando temporizador local al servidor")
+                        temporizadorUI?.cancel()
+                        iniciarTemporizadorConTiempo(tiempoRestanteSegundos)
+                    }
+                    */
+
+                } catch (e: Exception) {
+                    Log.e("TEMPORIZADOR_SYNC", "Error procesando servidor: ${e.message}")
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("TEMPORIZADOR_SYNC", "Error escuchando servidor: ${error.message}")
+            }
+        })
     }
 
     /**
