@@ -1,3 +1,9 @@
+const functions = require('firebase-functions');
+const admin = require('firebase-admin');
+const { getDatabase } = require('firebase-admin/database');
+
+admin.initializeApp();
+
 async function buscarMejorLineupDisponible(ligaId, usuarioId) {
   try {
     console.log(`🎯 Buscando MEJOR lineup disponible para usuario: ${usuarioId}`);
@@ -482,7 +488,8 @@ async function realizarSeleccionAutomatica(ligaId, temporizador, configDraft) {
       timestamp: Date.now(),
       ronda: configDraft.rondaActual,
       turno: configDraft.turnoActual,
-      seleccionAutomatica: true // Marcador importante
+      seleccionAutomatica: true, // Marcador importante
+      motivoAutomatico: 'tiempo_agotado'
     };
 
     // Guardar la selección
@@ -547,3 +554,171 @@ async function avanzarAlSiguienteTurno(ligaId, configDraft) {
     console.error('❌ Error avanzando turno:', error);
   }
 }
+
+/**
+ * NUEVO: Verificar si el usuario hizo una selección manual reciente
+ */
+async function verificarSeleccionReciente(ligaId, usuarioId, inicioTiempo) {
+  try {
+    const { getDatabase } = require('firebase-admin/database');
+    const db = getDatabase();
+
+    const lineupsRef = db.ref('LineupsSeleccionados');
+    const lineupsSnapshot = await lineupsRef.once('value');
+    const selecciones = lineupsSnapshot.val() || {};
+
+    // Buscar selecciones del usuario después del inicio del temporizador
+    const seleccionesUsuario = Object.values(selecciones).filter(seleccion =>
+      seleccion.usuarioId === usuarioId &&
+      seleccion.timestamp >= inicioTiempo &&
+      !seleccion.seleccionAutomatica // Solo selecciones manuales
+    );
+
+    return seleccionesUsuario.length > 0;
+
+  } catch (error) {
+    console.error('Error verificando selección reciente:', error);
+    return false;
+  }
+}
+
+/**
+ * NUEVO: Función para manejar el temporizador del servidor (cada 10 segundos)
+ */
+exports.verificarTemporizadores = functions.pubsub.schedule('every 1 minutes').onRun(async (context) => {
+  try {
+    console.log('🕐 Verificando temporizadores activos...');
+
+    const { getDatabase } = require('firebase-admin/database');
+    const db = getDatabase();
+
+    // Obtener todos los temporizadores activos
+    const temporizadoresRef = db.ref('TemporizadoresDraft');
+    const temporizadoresSnapshot = await temporizadoresRef.once('value');
+    const temporizadores = temporizadoresSnapshot.val() || {};
+
+    const ahora = Date.now();
+
+    for (const [ligaId, temporizador] of Object.entries(temporizadores)) {
+      if (!temporizador.activo) continue;
+
+      const tiempoTranscurrido = ahora - temporizador.inicioTiempo;
+      const tiempoLimite = 3 * 60 * 1000; // 3 minutos en milisegundos
+
+      console.log(`⏰ Liga ${ligaId}: ${Math.floor(tiempoTranscurrido / 1000)}s / ${Math.floor(tiempoLimite / 1000)}s`);
+
+      // Si el tiempo se agotó
+      if (tiempoTranscurrido >= tiempoLimite) {
+        console.log(`🚨 TIEMPO AGOTADO para liga ${ligaId} - usuario: ${temporizador.usuarioEnTurno}`);
+
+        // ✅ VERIFICAR si el usuario ya hizo su selección durante estos 3 minutos
+        const yaHizoSeleccion = await verificarSeleccionReciente(ligaId, temporizador.usuarioEnTurno, temporizador.inicioTiempo);
+
+        if (yaHizoSeleccion) {
+          console.log(`✅ Usuario ${temporizador.usuarioEnTurno} ya hizo su selección - no se requiere selección automática`);
+
+          // Detener temporizador ya que el usuario seleccionó a tiempo
+          await temporizadoresRef.child(ligaId).update({
+            activo: false,
+            finalizadoPor: 'seleccion_manual'
+          });
+
+        } else {
+          console.log(`🤖 Usuario ${temporizador.usuarioEnTurno} NO seleccionó - iniciando selección automática`);
+
+          // Obtener configuración del draft
+          const configRef = db.ref(`Ligas/${ligaId}/configuracion/configuracionDraft`);
+          const configSnapshot = await configRef.once('value');
+          const configDraft = configSnapshot.val();
+
+          if (configDraft) {
+            // ✅ Realizar selección automática con el MEJOR lineup disponible
+            const seleccionExitosa = await realizarSeleccionAutomatica(ligaId, temporizador, configDraft);
+
+            if (seleccionExitosa) {
+              console.log(`✅ Selección automática completada para ${temporizador.usuarioEnTurno}`);
+
+              // Detener temporizador
+              await temporizadoresRef.child(ligaId).update({
+                activo: false,
+                finalizadoPor: 'seleccion_automatica'
+              });
+
+            } else {
+              console.log(`❌ Error en selección automática para ${temporizador.usuarioEnTurno}`);
+            }
+          }
+        }
+      }
+    }
+
+    console.log('✅ Verificación de temporizadores completada');
+
+  } catch (error) {
+    console.error('❌ Error en temporizador del servidor:', error);
+  }
+});
+
+/**
+ * NUEVO: Función para iniciar temporizador cuando es el turno de un usuario
+ */
+exports.iniciarTemporizadorTurno = functions.database.ref('/Ligas/{ligaId}/configuracion/configuracionDraft/usuarioEnTurno')
+  .onUpdate(async (change, context) => {
+    try {
+      const ligaId = context.params.ligaId;
+      const nuevoUsuario = change.after.val();
+
+      if (!nuevoUsuario) return;
+
+      console.log(`🕐 Iniciando temporizador para usuario: ${nuevoUsuario} en liga: ${ligaId}`);
+
+      const { getDatabase } = require('firebase-admin/database');
+      const db = getDatabase();
+
+      // Crear/actualizar temporizador
+      await db.ref(`TemporizadoresDraft/${ligaId}`).set({
+        usuarioEnTurno: nuevoUsuario,
+        inicioTiempo: Date.now(),
+        activo: true,
+        ligaId: ligaId
+      });
+
+      console.log(`✅ Temporizador iniciado para ${nuevoUsuario}`);
+
+    } catch (error) {
+      console.error('❌ Error iniciando temporizador:', error);
+    }
+  });
+
+/**
+ * NUEVO: Función para detener temporizador cuando se hace una selección manual
+ */
+exports.detenerTemporizadorSeleccion = functions.database.ref('/LineupsSeleccionados/{seleccionId}')
+  .onCreate(async (snapshot, context) => {
+    try {
+      const seleccion = snapshot.val();
+
+      // Solo detener si es una selección manual (no automática)
+      if (seleccion.seleccionAutomatica) return;
+
+      const ligaId = seleccion.ligaId;
+      const usuarioId = seleccion.usuarioId;
+
+      console.log(`🛑 Deteniendo temporizador por selección manual de ${usuarioId} en liga ${ligaId}`);
+
+      const { getDatabase } = require('firebase-admin/database');
+      const db = getDatabase();
+
+      // Detener temporizador
+      await db.ref(`TemporizadoresDraft/${ligaId}`).update({
+        activo: false,
+        finalizadoPor: 'seleccion_manual',
+        usuarioQueSelecciono: usuarioId
+      });
+
+      console.log(`✅ Temporizador detenido - selección manual completada`);
+
+    } catch (error) {
+      console.error('❌ Error deteniendo temporizador:', error);
+    }
+  });

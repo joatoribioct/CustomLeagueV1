@@ -538,6 +538,10 @@ class FragmentInicio : Fragment() {
     /**
      * NUEVO: Temporizador visual independiente que SÍ funciona
      */
+    /**
+     * CORREGIDO: Temporizador visual que NO hace selección automática
+     * Solo muestra el conteo y deja que el servidor maneje todo
+     */
     private fun iniciarTemporizadorUI() {
         // Detener temporizador anterior si existe
         temporizadorUI?.cancel()
@@ -557,9 +561,10 @@ class FragmentInicio : Fragment() {
             override fun onFinish() {
                 Log.d("TEMPORIZADOR_UI", "⏰ Temporizador UI terminado")
                 if (isAdded) {
-                    // Mostrar tiempo agotado
+                    // Solo mostrar tiempo agotado y mensaje
                     actualizarTemporizadorUI(0)
-                    // El callback del servidor se encargará de la selección automática
+                    manejarTiempoAgotado()
+                    // El servidor se encarga de la selección automática automáticamente
                 }
             }
         }
@@ -567,12 +572,38 @@ class FragmentInicio : Fragment() {
         temporizadorUI?.start()
     }
 
-
-// MEJORAR verificarYIniciarTemporizador() con más inteligencia:
-
     /**
-     * ✏️ MODIFICADO: Solo verificar, nunca reiniciar temporizador
+     * NUEVO: Crear temporizador del servidor manualmente
      */
+    private fun crearTemporizadorServidor() {
+        val ligaId = ligaActual?.id ?: return
+        val usuarioId = firebaseAuth.uid ?: return
+
+        Log.d("TEMPORIZADOR_SERVER", "🔧 Creando temporizador del servidor para $usuarioId")
+
+        val temporizadorRef = FirebaseDatabase.getInstance()
+            .getReference("TemporizadoresDraft")
+            .child(ligaId)
+
+        val temporizadorData = mapOf(
+            "usuarioEnTurno" to usuarioId,
+            "inicioTiempo" to System.currentTimeMillis(),
+            "activo" to true,
+            "ligaId" to ligaId
+        )
+
+        temporizadorRef.setValue(temporizadorData)
+            .addOnSuccessListener {
+                Log.d("TEMPORIZADOR_SERVER", "✅ Temporizador del servidor creado exitosamente")
+                // Ahora verificar de nuevo
+                reconectarTemporizador()
+            }
+            .addOnFailureListener { error ->
+                Log.e("TEMPORIZADOR_SERVER", "❌ Error creando temporizador: ${error.message}")
+            }
+    }
+
+    // ✅ MODIFICAR la función verificarYIniciarTemporizador() existente:
     private fun verificarYIniciarTemporizador() {
         val usuarioId = firebaseAuth.uid ?: ""
         val puedeSeleccionar = controladorDraft?.puedeSeleccionar(usuarioId) ?: false
@@ -584,7 +615,9 @@ class FragmentInicio : Fragment() {
             if (estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado) {
                 Log.d("DEBUG_TEMPORIZADOR", "🎯 ES MI TURNO")
 
-                // CAMBIO CLAVE: Solo verificar servidor, nunca crear nuevo temporizador
+                // ✅ AGREGAR esta línea:
+                crearTemporizadorServidor()
+
                 Log.d("DEBUG_TEMPORIZADOR", "🔍 Verificando estado del servidor...")
                 reconectarTemporizador()
             }
@@ -736,40 +769,6 @@ class FragmentInicio : Fragment() {
     }
 
     /**
-     * NUEVO: Mostrar notificación visual de selección automática
-     */
-    private fun mostrarNotificacionSeleccionAutomatica() {
-        try {
-            if (::binding.isInitialized) {
-                // Crear un TextView temporal para la notificación
-                val notificacion = TextView(requireContext()).apply {
-                    text = "🤖 Selección automática en progreso..."
-                    setTextColor(Color.WHITE)
-                    setBackgroundColor(Color.parseColor("#FF9800"))
-                    textSize = 14f
-                    setPadding(16, 8, 16, 8)
-                    gravity = Gravity.CENTER
-                }
-
-                // Agregar al layout principal temporalmente
-                val parentLayout = binding.root as? ViewGroup
-                parentLayout?.addView(notificacion)
-
-                // Remover después de 3 segundos
-                Handler(Looper.getMainLooper()).postDelayed({
-                    try {
-                        parentLayout?.removeView(notificacion)
-                    } catch (e: Exception) {
-                        Log.w("SELECCION_AUTO", "Error removiendo notificación: ${e.message}")
-                    }
-                }, 3000)
-            }
-        } catch (e: Exception) {
-            Log.w("SELECCION_AUTO", "Error mostrando notificación: ${e.message}")
-        }
-    }
-
-    /**
      * NUEVO: Calcula cuántos usuarios faltan para el turno del usuario actual
      */
     private fun calcularPosicionEnCola(): Int {
@@ -902,82 +901,6 @@ class FragmentInicio : Fragment() {
         }
     }
 
-
-    /**
-     * NUEVO: Busca un lineup disponible para selección automática
-     */
-    private fun buscarLineupDisponible(): Triple<String, Map<String, Map<String, Any>>, String>? {
-        try {
-            // Lista de tipos de lineup en orden de prioridad
-            val tiposLineup = listOf("infield", "outfield", "pitchers", "relief")
-
-            for (equipoId in Constantes.equiposNombres) {
-                val equipoKey = equipoId.replace(" ", "")
-
-                for (tipo in tiposLineup) {
-                    // Verificar si ya seleccioné este tipo
-                    if (yaSeleccioneTipoLineup(tipo)) continue
-
-                    // Verificar si este lineup específico ya está tomado
-                    if (estaLineupSeleccionado(equipoKey, tipo)) continue
-
-                    // Obtener jugadores del equipo
-                    val jugadores = obtenerJugadoresEquipo(equipoKey, tipo)
-                    if (jugadores.isNotEmpty()) {
-                        Log.d("SELECCION_AUTO", "Lineup disponible encontrado: $equipoKey - $tipo")
-                        return Triple(tipo, jugadores, equipoKey)
-                    }
-                }
-            }
-
-            return null
-        } catch (e: Exception) {
-            Log.e("SELECCION_AUTO", "Error buscando lineup: ${e.message}")
-            return null
-        }
-    }
-
-    /**
-     * NUEVO: Obtiene jugadores de un equipo específico (simulado para selección automática)
-     */
-    private fun obtenerJugadoresEquipo(equipoId: String, tipo: String): Map<String, Map<String, Any>> {
-        // Esta es una implementación simplificada para la selección automática
-        // Los datos reales se obtienen cuando el usuario selecciona manualmente
-        return when (tipo) {
-            "infield" -> mapOf(
-                "C" to mapOf("nombre" to "Auto Catcher", "rating" to 75),
-                "1B" to mapOf("nombre" to "Auto 1B", "rating" to 80),
-                "2B" to mapOf("nombre" to "Auto 2B", "rating" to 78),
-                "3B" to mapOf("nombre" to "Auto 3B", "rating" to 82),
-                "SS" to mapOf("nombre" to "Auto SS", "rating" to 85)
-            )
-            "outfield" -> mapOf(
-                "LF" to mapOf("nombre" to "Auto LF", "rating" to 79),
-                "CF" to mapOf("nombre" to "Auto CF", "rating" to 83),
-                "RF" to mapOf("nombre" to "Auto RF", "rating" to 77),
-                "DH" to mapOf("nombre" to "Auto DH", "rating" to 81)
-            )
-            "pitchers" -> mapOf(
-                "SP1" to mapOf("nombre" to "Auto SP1", "rating" to 82),
-                "SP2" to mapOf("nombre" to "Auto SP2", "rating" to 78),
-                "SP3" to mapOf("nombre" to "Auto SP3", "rating" to 76),
-                "SP4" to mapOf("nombre" to "Auto SP4", "rating" to 74),
-                "SP5" to mapOf("nombre" to "Auto SP5", "rating" to 72)
-            )
-            "relief" -> mapOf(
-                "RP1" to mapOf("nombre" to "Auto RP1", "rating" to 75),
-                "RP2" to mapOf("nombre" to "Auto RP2", "rating" to 73),
-                "RP3" to mapOf("nombre" to "Auto RP3", "rating" to 71),
-                "RP4" to mapOf("nombre" to "Auto RP4", "rating" to 69),
-                "RP5" to mapOf("nombre" to "Auto RP5", "rating" to 67),
-                "RP6" to mapOf("nombre" to "Auto RP6", "rating" to 65),
-                "RP7" to mapOf("nombre" to "Auto RP7", "rating" to 63),
-                "RP8" to mapOf("nombre" to "Auto RP8", "rating" to 80)
-            )
-            else -> emptyMap()
-        }
-    }
-
     /**
      * NUEVO: Muestra información del turno actual
      */
@@ -1021,6 +944,69 @@ class FragmentInicio : Fragment() {
                 Log.e("LIGA_ERROR", "Error al buscar cualquier liga: ${error.message}")
             }
         })
+    }
+
+    /**
+     * CORREGIDO: El servidor maneja toda la selección automática
+     * El cliente solo muestra el mensaje y espera la respuesta del servidor
+     */
+    private fun manejarTiempoAgotado() {
+        Log.d("TEMPORIZADOR_UI", "⏰ Tiempo agotado - el servidor manejará la selección automática")
+
+        try {
+            if (::binding.isInitialized) {
+                mostrarMensajeSeleccionAutomatica()
+            }
+        } catch (e: Exception) {
+            Log.w("TEMPORIZADOR_UI", "Error mostrando mensaje: ${e.message}")
+        }
+
+        // No hacemos nada más - el servidor se encarga de todo automáticamente
+        Log.d("SELECCION_AUTO", "🤖 Esperando que el servidor seleccione el mejor lineup disponible...")
+    }
+
+    /**
+     * ACTUALIZADO: Mostrar notificación cuando el servidor completa la selección automática
+     */
+    private fun mostrarNotificacionSeleccionAutomatica() {
+        try {
+            if (::binding.isInitialized) {
+                // Mostrar mensaje en la UI
+                Toast.makeText(
+                    requireContext(),
+                    "🤖 El servidor está seleccionando automáticamente el mejor lineup disponible...",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                // Cambiar UI para mostrar que se está procesando
+                binding.tvTiempoRestante?.text = "0:00"
+
+                // Crear notificación visual temporal
+                val notificacion = TextView(requireContext()).apply {
+                    text = "⏳ Selección automática en progreso..."
+                    setTextColor(Color.WHITE)
+                    setBackgroundColor(Color.parseColor("#FF9800"))
+                    textSize = 14f
+                    setPadding(16, 8, 16, 8)
+                    gravity = Gravity.CENTER
+                }
+
+                // Agregar al layout temporalmente
+                val parentLayout = binding.root as? ViewGroup
+                parentLayout?.addView(notificacion)
+
+                // Remover después de 3 segundos
+                Handler(Looper.getMainLooper()).postDelayed({
+                    try {
+                        parentLayout?.removeView(notificacion)
+                    } catch (e: Exception) {
+                        Log.w("SELECCION_AUTO", "Error removiendo notificación: ${e.message}")
+                    }
+                }, 3000)
+            }
+        } catch (e: Exception) {
+            Log.w("SELECCION_AUTO", "Error mostrando notificación: ${e.message}")
+        }
     }
 
     private fun cargarEquipos() {

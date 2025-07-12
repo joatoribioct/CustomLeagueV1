@@ -25,8 +25,11 @@ class LineupViewModel : ViewModel() {
             return false
         } else {
             // Si no existe, agregar nuevo lineup
-            listaActual.add(ModeloDraftSelecionado(tipo, jugadores))
-            // Actualizar el LiveData para notificar a los observadores
+        // ✅ CORRECTO - Reemplázala con:
+            listaActual.add(ModeloDraftSelecionado(
+                tipoLineup = tipo,
+                jugadores = jugadores
+            ))            // Actualizar el LiveData para notificar a los observadores
             _lineups.value = listaActual
             return true
         }
