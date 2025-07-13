@@ -10,9 +10,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.joatoribio.customleaguebeisbol.OnLineupClickListener
 import com.joatoribio.customleaguebeisbol.R
+import com.joatoribio.customleaguebeisbol.Utils.RatingCalculator
+import com.joatoribio.customleaguebeisbol.Utils.RatingUtils
 
 class LineupsAdapter(
-    private val lineups: List<Triple<String, Map<String, Map<String, Any>>, Boolean>>, // Triple incluye si está seleccionado
+    private val lineups: List<Triple<String, Map<String, Map<String, Any>>, Boolean>>,
     private val equipoId: String,
     private val listener: OnLineupClickListener
 ) : RecyclerView.Adapter<LineupsAdapter.LineupViewHolder>() {
@@ -44,8 +46,8 @@ class LineupsAdapter(
 
         holder.tvTipoLineup.text = nombreTipo
 
-        // Convertir los jugadores a una lista de JugadorInfo
-        val listaJugadores = convertirJugadoresALista(jugadores)
+        // Usar RatingCalculator para convertir jugadores
+        val listaJugadores = RatingCalculator.convertirJugadoresALista(jugadores)
 
         // Configurar el RecyclerView de jugadores
         holder.rvJugadores.apply {
@@ -54,126 +56,34 @@ class LineupsAdapter(
             isNestedScrollingEnabled = false
         }
 
-        // Configurar el estado visual según si está seleccionado o no
+        // Configurar estado y apariencia según si está seleccionado
         if (estaSeleccionado) {
-            // Lineup ya seleccionado - desactivado
-            holder.cardView.apply {
-                setCardBackgroundColor(Color.parseColor("#F5F5F5")) // Gris claro
-                alpha = 0.6f
-                isClickable = false
-                isFocusable = false
-            }
-
-            holder.tvTipoLineup.setTextColor(Color.parseColor("#757575")) // Gris oscuro
-
-            holder.tvEstado.apply {
-                visibility = View.VISIBLE
-                text = "🔒 Ya seleccionado"
-                setTextColor(Color.parseColor("#F44336")) // Rojo
-                textSize = 12f
-            }
-
-            // Remover cualquier listener de click
-            holder.cardView.setOnClickListener(null)
-
+            holder.tvEstado.text = "No disponible"
+            holder.tvEstado.setTextColor(Color.parseColor("#F44336"))
+            holder.cardView.alpha = 0.5f
+            holder.cardView.isClickable = false
+            holder.cardView.isEnabled = false
         } else {
-            // Lineup disponible - activado
-            holder.cardView.apply {
-                setCardBackgroundColor(Color.parseColor("#FFFFFF")) // Blanco
-                alpha = 1.0f
-                isClickable = true
-                isFocusable = true
+            // Calcular y mostrar rating promedio usando RatingCalculator
+            val ratingPromedio = RatingCalculator.calcularRatingPromedio(listaJugadores)
+            holder.tvEstado.text = RatingUtils.getRatingConEmoji(ratingPromedio)
+            holder.tvEstado.setTextColor(RatingUtils.getRatingColor(ratingPromedio))
 
-                // Efecto de elevación para indicar que es clickeable
-                cardElevation = 8f
-            }
+            holder.cardView.alpha = 1.0f
+            holder.cardView.isClickable = true
+            holder.cardView.isEnabled = true
 
-            holder.tvTipoLineup.setTextColor(Color.parseColor("#212121")) // Negro
-
-            holder.tvEstado.apply {
-                visibility = View.VISIBLE
-                text = "✅ Disponible"
-                setTextColor(Color.parseColor("#4CAF50")) // Verde
-                textSize = 12f
-            }
-
-            // Configurar click listener
+            // Configurar click listener solo si no está seleccionado
             holder.cardView.setOnClickListener {
                 listener.onlineupClick(tipo, jugadores)
-            }
-
-            // Efecto visual al tocar
-            holder.cardView.setOnTouchListener { v, event ->
-                when (event.action) {
-                    android.view.MotionEvent.ACTION_DOWN -> {
-                        v.alpha = 0.8f
-                    }
-                    android.view.MotionEvent.ACTION_UP,
-                    android.view.MotionEvent.ACTION_CANCEL -> {
-                        v.alpha = 1.0f
-                    }
-                }
-                false
             }
         }
     }
 
     override fun getItemCount(): Int = lineups.size
-
-    /**
-     * Convierte el Map de jugadores a una lista de JugadorInfo
-     */
-    private fun convertirJugadoresALista(jugadores: Map<String, Map<String, Any>>): List<JugadorInfo> {
-        val listaJugadores = mutableListOf<JugadorInfo>()
-
-        for ((posicion, datosJugador) in jugadores) {
-            val nombre = datosJugador["nombre"] as? String ?: "Sin nombre"
-            val rating = when (val ratingValue = datosJugador["rating"]) {
-                is Number -> ratingValue.toInt()
-                is String -> ratingValue.toIntOrNull() ?: 0
-                else -> 0
-            }
-
-            listaJugadores.add(JugadorInfo(posicion, nombre, rating))
-        }
-
-        // Ordenar por posición para un orden consistente
-        return listaJugadores.sortedBy { obtenerOrdenPosicion(it.posicion) }
-    }
-
-    /**
-     * Obtiene un orden numérico para las posiciones para mantener consistencia
-     */
-    private fun obtenerOrdenPosicion(posicion: String): Int {
-        return when (posicion) {
-            "C" -> 1
-            "1B" -> 2
-            "2B" -> 3
-            "3B" -> 4
-            "SS" -> 5
-            "LF" -> 6
-            "CF" -> 7
-            "RF" -> 8
-            "DH" -> 9
-            "SP1" -> 10
-            "SP2" -> 11
-            "SP3" -> 12
-            "SP4" -> 13
-            "SP5" -> 14
-            "RP1" -> 15
-            "RP2" -> 16
-            "RP3" -> 17
-            "RP4" -> 18
-            "RP5" -> 19
-            "RP6" -> 20
-            "RP7" -> 21
-            "RP8" -> 22
-            else -> 999
-        }
-    }
 }
 
-// Interfaz para el listener (si no la tienes ya)
+// Interfaz para el listener (mantener si no existe)
 interface OnLineupClickListener {
     fun onlineupClick(tipo: String, jugadores: Map<String, Map<String, Any>>)
 }

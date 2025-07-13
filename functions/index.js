@@ -404,7 +404,7 @@ async function obtenerDatosEquipos() {
             },
             "relief": {
               "RP1": {"nombre": "A.DIAZ", "rating": 81},
-              "RP2": {"nome": "F.CRUZ", "rating": 76},
+              "RP2": {"nombre": "F.CRUZ", "rating": 76},
               "RP3": {"nombre": "B.FARMER", "rating": 73},
               "RP4": {"nombre": "S.MOLL", "rating": 71},
               "RP5": {"nombre": "Y.SANTILLAN", "rating": 69},
@@ -433,20 +433,20 @@ async function obtenerDatosEquipos() {
             },
             "pitchers": {
               "SP1": {"nombre": "S.BIEBER", "rating": 86},
-              "SP2": {"nome": "T.MCKENZIE", "rating": 78},
+              "SP2": {"nombre": "T.MCKENZIE", "rating": 78},
               "SP3": {"nombre": "B.LIVELY", "rating": 75},
               "SP4": {"nombre": "C.WILLIAMS", "rating": 73},
               "SP5": {"nombre": "G.CANTILLO", "rating": 71}
             },
             "relief": {
-              "RP1": {"nome": "E.CLASE", "rating": 91},
-              "RP2": {"nome": "C.FAIRBANKS", "rating": 79},
-              "RP3": {"nome": "S.HENTGES", "rating": 74},
-              "RP4": {"nome": "T.KARINCHAK", "rating": 76},
-              "RP5": {"nome": "A.MORGAN", "rating": 72},
-              "RP6": {"nome": "H.GADDIS", "rating": 68},
-              "RP7": {"nome": "P.SANDLIN", "rating": 70},
-              "RP8": {"nome": "C.SMITH", "rating": 69}
+              "RP1": {"nombre": "E.CLASE", "rating": 91},
+              "RP2": {"nombre": "C.FAIRBANKS", "rating": 79},
+              "RP3": {"nombre": "S.HENTGES", "rating": 74},
+              "RP4": {"nombre": "T.KARINCHAK", "rating": 76},
+              "RP5": {"nombre": "A.MORGAN", "rating": 72},
+              "RP6": {"nombre": "H.GADDIS", "rating": 68},
+              "RP7": {"nombre": "P.SANDLIN", "rating": 70},
+              "RP8": {"nombre": "C.SMITH", "rating": 69}
             }
           }
         },
@@ -602,16 +602,18 @@ exports.verificarTemporizadores = functions.pubsub.schedule('every 1 minutes').o
     for (const [ligaId, temporizador] of Object.entries(temporizadores)) {
       if (!temporizador.activo) continue;
 
-      const tiempoTranscurrido = ahora - temporizador.inicioTiempo;
-      const tiempoLimite = 3 * 60 * 1000; // 3 minutos en milisegundos
+      // NUEVO: Usar timestampVencimiento en lugar de calcular tiempo transcurrido
+      const timestampVencimiento = temporizador.timestampVencimiento || 0;
+      const tiempoRestanteMs = timestampVencimiento - ahora;
+      const tiempoRestanteSegundos = Math.floor(tiempoRestanteMs / 1000);
 
-      console.log(`⏰ Liga ${ligaId}: ${Math.floor(tiempoTranscurrido / 1000)}s / ${Math.floor(tiempoLimite / 1000)}s`);
+      console.log(`⏰ Liga ${ligaId}: ${tiempoRestanteSegundos}s restantes`);
 
       // Si el tiempo se agotó
-      if (tiempoTranscurrido >= tiempoLimite) {
+      if (tiempoRestanteMs <= 0) {
         console.log(`🚨 TIEMPO AGOTADO para liga ${ligaId} - usuario: ${temporizador.usuarioEnTurno}`);
 
-        // ✅ VERIFICAR si el usuario ya hizo su selección durante estos 3 minutos
+        // Verificar si el usuario ya hizo su selección durante estos 3 minutos
         const yaHizoSeleccion = await verificarSeleccionReciente(ligaId, temporizador.usuarioEnTurno, temporizador.inicioTiempo);
 
         if (yaHizoSeleccion) {
@@ -632,7 +634,7 @@ exports.verificarTemporizadores = functions.pubsub.schedule('every 1 minutes').o
           const configDraft = configSnapshot.val();
 
           if (configDraft) {
-            // ✅ Realizar selección automática con el MEJOR lineup disponible
+            // Realizar selección automática con el MEJOR lineup disponible
             const seleccionExitosa = await realizarSeleccionAutomatica(ligaId, temporizador, configDraft);
 
             if (seleccionExitosa) {
@@ -649,6 +651,9 @@ exports.verificarTemporizadores = functions.pubsub.schedule('every 1 minutes').o
             }
           }
         }
+      } else {
+        // OPCIONAL: Actualizar tiempo restante en la base de datos para debugging
+        console.log(`⏱️ Liga ${ligaId}: ${tiempoRestanteSegundos}s restantes para ${temporizador.usuarioEnTurno}`);
       }
     }
 
@@ -675,15 +680,29 @@ exports.iniciarTemporizadorTurno = functions.database.ref('/Ligas/{ligaId}/confi
       const { getDatabase } = require('firebase-admin/database');
       const db = getDatabase();
 
-      // Crear/actualizar temporizador
+      // IMPORTANTE: Calcular timestamp de vencimiento (3 minutos desde ahora)
+      const ahora = Date.now();
+      const tiempoLimiteMs = 3 * 60 * 1000; // 3 minutos en milisegundos
+      const timestampVencimiento = ahora + tiempoLimiteMs;
+
+      // Obtener información adicional del draft
+      const configRef = db.ref(`Ligas/${ligaId}/configuracion/configuracionDraft`);
+      const configSnapshot = await configRef.once('value');
+      const configDraft = configSnapshot.val();
+
+      // Crear/actualizar temporizador con timestamp de vencimiento
       await db.ref(`TemporizadoresDraft/${ligaId}`).set({
         usuarioEnTurno: nuevoUsuario,
-        inicioTiempo: Date.now(),
+        inicioTiempo: ahora,
+        timestampVencimiento: timestampVencimiento, // NUEVO: Timestamp absoluto de vencimiento
         activo: true,
-        ligaId: ligaId
+        ligaId: ligaId,
+        ronda: configDraft.rondaActual || 1,
+        turno: configDraft.turnoActual || 0
       });
 
       console.log(`✅ Temporizador iniciado para ${nuevoUsuario}`);
+      console.log(`⏰ Vencerá en: ${new Date(timestampVencimiento).toLocaleTimeString()}`);
 
     } catch (error) {
       console.error('❌ Error iniciando temporizador:', error);

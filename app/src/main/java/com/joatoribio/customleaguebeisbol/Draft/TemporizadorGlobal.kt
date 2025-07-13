@@ -9,8 +9,8 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 
 /**
- * ACTUALIZADO: Temporizador que se sincroniza con el servidor
- * El temporizador del servidor es la fuente de verdad
+ * Temporizador que se sincroniza con el timestamp de vencimiento del servidor
+ * Mantiene la cuenta regresiva aunque se cierre la app o cambie de fragment
  */
 object TemporizadorGlobal {
 
@@ -29,7 +29,7 @@ object TemporizadorGlobal {
     private var serverTimerListener: ValueEventListener? = null
 
     /**
-     * NUEVO: Iniciar temporizador sincronizado con servidor
+     * Iniciar temporizador sincronizado con servidor
      */
     fun iniciarTemporizador(
         usuarioId: String,
@@ -61,7 +61,7 @@ object TemporizadorGlobal {
     }
 
     /**
-     * NUEVO: Sincronizar con el temporizador del servidor
+     * Sincronizar con el temporizador del servidor usando timestampVencimiento
      */
     private fun sincronizarConServidor(ligaId: String) {
         val temporizadorRef = FirebaseDatabase.getInstance()
@@ -85,6 +85,7 @@ object TemporizadorGlobal {
                     return
                 }
 
+                // IMPORTANTE: Usar timestampVencimiento del servidor
                 val timestampVencimiento = (serverTimer["timestampVencimiento"] as? Long) ?: 0L
                 val rondaServidor = (serverTimer["ronda"] as? Long)?.toInt() ?: 0
                 val turnoServidor = (serverTimer["turno"] as? Long)?.toInt() ?: 0
@@ -96,17 +97,20 @@ object TemporizadorGlobal {
                     return
                 }
 
-                val tiempoRestanteMs = timestampVencimiento - System.currentTimeMillis()
+                // Calcular tiempo restante basado en timestamp absoluto
+                val ahora = System.currentTimeMillis()
+                val tiempoRestanteMs = timestampVencimiento - ahora
                 val tiempoRestanteSegundos = (tiempoRestanteMs / 1000).toInt()
 
-                Log.d("TEMPORIZADOR_GLOBAL", "⏰ Tiempo restante del servidor: ${tiempoRestanteSegundos}s")
+                Log.d("TEMPORIZADOR_GLOBAL", "⏰ Timestamp vencimiento: $timestampVencimiento")
+                Log.d("TEMPORIZADOR_GLOBAL", "⏰ Tiempo restante: ${tiempoRestanteSegundos}s")
 
                 if (tiempoRestanteSegundos <= 0) {
                     Log.d("TEMPORIZADOR_GLOBAL", "⏰ Tiempo agotado según servidor")
                     onFinishCallback?.invoke()
                     detenerTemporizador()
                 } else {
-                    // Iniciar cuenta regresiva local sincronizada
+                    // Iniciar cuenta regresiva local sincronizada con el timestamp
                     iniciarCuentaRegresivaLocal(tiempoRestanteSegundos)
                 }
             }
@@ -116,90 +120,53 @@ object TemporizadorGlobal {
             }
         }
 
+        // Escuchar cambios en tiempo real
         temporizadorRef.addValueEventListener(serverTimerListener!!)
     }
 
     /**
-     * NUEVO: Iniciar cuenta regresiva local sincronizada con servidor
+     * Iniciar cuenta regresiva local basada en el tiempo restante del servidor
      */
-    private fun iniciarCuentaRegresivaLocal(tiempoInicialSegundos: Int) {
-        // Detener runnable anterior si existe
+    private fun iniciarCuentaRegresivaLocal(segundosRestantes: Int) {
+        // Cancelar runnable anterior si existe
         runnable?.let { handler?.removeCallbacks(it) }
 
-        var tiempoRestante = tiempoInicialSegundos
+        var tiempoRestante = segundosRestantes
 
         runnable = object : Runnable {
             override fun run() {
-                if (tiempoRestante <= 0) {
-                    Log.d("TEMPORIZADOR_GLOBAL", "⏰ Tiempo agotado en cliente")
+                if (tiempoRestante > 0) {
+                    // Notificar callback
+                    onTickCallback?.invoke(tiempoRestante)
+
+                    // Decrementar y programar siguiente tick
+                    tiempoRestante--
+                    handler?.postDelayed(this, 1000)
+                } else {
+                    // Tiempo agotado
+                    Log.d("TEMPORIZADOR_GLOBAL", "⏰ Tiempo agotado localmente")
                     onFinishCallback?.invoke()
                     detenerTemporizador()
-                    return
                 }
-
-                // Actualizar UI
-                onTickCallback?.invoke(tiempoRestante)
-
-                // Programar siguiente tick
-                tiempoRestante--
-                handler?.postDelayed(this, 1000)
             }
         }
 
-        // Iniciar inmediatamente
-        runnable?.let { handler?.post(it) }
+        // Ejecutar inmediatamente el primer tick
+        handler?.post(runnable!!)
     }
 
     /**
-     * Verificar si el temporizador está activo para un turno específico
-     */
-    fun estaActivoPara(usuarioId: String, ligaId: String, ronda: Int, turno: Int): Boolean {
-        return usuarioActualId == usuarioId &&
-                ligaActualId == ligaId &&
-                rondaActual == ronda &&
-                turnoActual == turno &&
-                handler != null
-    }
-
-    /**
-     * Registrar callbacks sin iniciar temporizador (para reconexión)
-     */
-    fun registrarCallbacks(
-        onTick: (Int) -> Unit,
-        onFinish: () -> Unit
-    ) {
-        onTickCallback = onTick
-        onFinishCallback = onFinish
-
-        // Si hay un temporizador activo, reconectar con el servidor
-        ligaActualId?.let { ligaId ->
-            sincronizarConServidor(ligaId)
-        }
-    }
-
-    /**
-     * Desregistrar callbacks (cuando el fragmento se oculta)
-     */
-    fun desregistrarCallbacks() {
-        onTickCallback = null
-        onFinishCallback = null
-
-        // No detener el temporizador, solo las callbacks
-        Log.d("TEMPORIZADOR_GLOBAL", "📱 Callbacks desregistrados")
-    }
-
-    /**
-     * Detener temporizador completamente
+     * Detener temporizador
      */
     fun detenerTemporizador() {
-        Log.d("TEMPORIZADOR_GLOBAL", "🛑 Deteniendo temporizador global")
+        Log.d("TEMPORIZADOR_GLOBAL", "🛑 Deteniendo temporizador")
 
-        // Detener runnable local
+        // Cancelar runnable
         runnable?.let { handler?.removeCallbacks(it) }
         runnable = null
         handler = null
 
-        // Detener listener del servidor
+        // Remover listener del servidor
         serverTimerListener?.let { listener ->
             ligaActualId?.let { ligaId ->
                 FirebaseDatabase.getInstance()
@@ -222,7 +189,7 @@ object TemporizadorGlobal {
     }
 
     /**
-     * NUEVO: Verificar estado del temporizador del servidor
+     * Verificar estado del temporizador del servidor (para reconexión)
      */
     fun verificarEstadoServidor(ligaId: String, callback: (Boolean, Int) -> Unit) {
         val temporizadorRef = FirebaseDatabase.getInstance()
@@ -240,10 +207,11 @@ object TemporizadorGlobal {
                 val activo = serverTimer["activo"] as? Boolean ?: false
                 val timestampVencimiento = (serverTimer["timestampVencimiento"] as? Long) ?: 0L
 
-                val tiempoRestanteMs = timestampVencimiento - System.currentTimeMillis()
+                val ahora = System.currentTimeMillis()
+                val tiempoRestanteMs = timestampVencimiento - ahora
                 val tiempoRestanteSegundos = (tiempoRestanteMs / 1000).toInt()
 
-                callback(activo, tiempoRestanteSegundos)
+                callback(activo && tiempoRestanteSegundos > 0, tiempoRestanteSegundos)
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -251,5 +219,22 @@ object TemporizadorGlobal {
                 callback(false, 0)
             }
         })
+    }
+
+    /**
+     * Desregistrar callbacks sin detener el temporizador
+     * (útil cuando el fragment se pausa pero el temporizador debe continuar)
+     */
+    fun desregistrarCallbacks() {
+        onTickCallback = null
+        onFinishCallback = null
+    }
+
+    /**
+     * Re-registrar callbacks cuando el fragment se reanuda
+     */
+    fun registrarCallbacks(onTick: (Int) -> Unit, onFinish: () -> Unit) {
+        onTickCallback = onTick
+        onFinishCallback = onFinish
     }
 }

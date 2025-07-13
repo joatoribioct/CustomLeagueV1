@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2025-07-12T20:52:45.480897300Z">
+        <DropdownSelection timestamp="2025-07-13T23:34:49.246489200Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=11ca941e" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\The Mask Power\.android\avd\Chat_APP.avd" />
             </handle>
           </Target>
         </DropdownSelection>

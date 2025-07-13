@@ -40,6 +40,7 @@ import com.joatoribio.customleaguebeisbol.Modelo.ModeloLiga
 import com.joatoribio.customleaguebeisbol.OnLineupClickListener
 import com.joatoribio.customleaguebeisbol.R
 import com.joatoribio.customleaguebeisbol.RvListennerEquipos
+import com.joatoribio.customleaguebeisbol.Utils.RatingCalculator
 import com.joatoribio.customleaguebeisbol.databinding.FragmentInicioBinding
 
 // Modelos de datos
@@ -57,7 +58,8 @@ data class LineupSeleccionado(
     val fechaSeleccion: Long = 0,
     val jugadores: Map<String, Map<String, Any>> = emptyMap(),
     val ronda: Int = 1,
-    val turno: Int = 0
+    val turno: Int = 0,
+    val ratingPromedio: Int = 0  // NUEVO: Campo para rating promedio
 )
 
 class FragmentInicio : Fragment() {
@@ -240,7 +242,7 @@ class FragmentInicio : Fragment() {
 
                             // Verificar después de un pequeño delay adicional
                             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                verificarYIniciarTemporizador()
+                                verificarYActivarTemporizador()
                                 verificacionEnProceso = false
                             }, 500)
                         }
@@ -318,7 +320,7 @@ class FragmentInicio : Fragment() {
                     if (puedeSeleccionar && !temporizadorInicializado) {
                         Log.d("DEBUG_TEMPORIZADOR", "🎯 ES MI TURNO - Verificación ÚNICA")
                         // LLAMAR SOLO UNA VEZ para evitar bucles
-                        verificarYIniciarTemporizador()
+                        verificarYActivarTemporizador()
                     } else if (!puedeSeleccionar) {
                         Log.d("DEBUG_TEMPORIZADOR", "⏸️ NO es mi turno - Ocultando")
                         ocultarTemporizador()
@@ -590,40 +592,65 @@ class FragmentInicio : Fragment() {
             }
     }
 
-    private fun verificarYIniciarTemporizador() {
+    private fun verificarYActivarTemporizador() {
         val usuarioId = firebaseAuth.uid ?: ""
         val puedeSeleccionar = controladorDraft?.puedeSeleccionar(usuarioId) ?: false
 
         Log.d("DEBUG_TEMPORIZADOR", "🔍 Verificando temporizador - Puede seleccionar: $puedeSeleccionar")
-        Log.d("DEBUG_TEMPORIZADOR", "🔍 Temporizador inicializado: $temporizadorInicializado")
 
         if (puedeSeleccionar && estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado) {
             Log.d("DEBUG_TEMPORIZADOR", "🎯 ES MI TURNO")
 
-            // CORREGIDO: En lugar del bucle, verificar si el temporizador ya está funcionando
-            if (!temporizadorInicializado) {
-                Log.d("DEBUG_TEMPORIZADOR", "🚀 Iniciando temporizador directamente")
+            // Verificar estado del temporizador en el servidor
+            ligaActual?.id?.let { ligaId ->
+                TemporizadorGlobal.verificarEstadoServidor(ligaId) { activo, tiempoRestante ->
+                    if (activo && tiempoRestante > 0) {
+                        Log.d("DEBUG_TEMPORIZADOR", "⏰ Temporizador activo en servidor con ${tiempoRestante}s restantes")
 
-                // Mostrar el layout del temporizador inmediatamente
-                try {
-                    if (::binding.isInitialized) {
-                        binding.layoutTemporizador.visibility = View.VISIBLE
-                        // Inicializar con tiempo completo
-                        actualizarTemporizadorUI(tiempoTotalSegundos)
+                        // Mostrar UI y conectar con el temporizador existente
+                        if (isAdded && ::binding.isInitialized) {
+                            binding.layoutTemporizador.visibility = View.VISIBLE
+
+                            // Registrar callbacks para recibir actualizaciones
+                            TemporizadorGlobal.registrarCallbacks(
+                                onTick = { segundos ->
+                                    if (isAdded && ::binding.isInitialized) {
+                                        actualizarTemporizadorUI(segundos)
+                                    }
+                                },
+                                onFinish = {
+                                    if (isAdded) {
+                                        manejarTiempoAgotado()
+                                    }
+                                }
+                            )
+
+                            // Si el temporizador no está corriendo, iniciarlo
+                            if (!temporizadorInicializado) {
+                                TemporizadorGlobal.iniciarTemporizador(
+                                    usuarioId = usuarioId,
+                                    ligaId = ligaId,
+                                    ronda = estadoDraftActual.rondaActual,
+                                    turno = estadoDraftActual.turnoActual,
+                                    onTick = { segundos ->
+                                        if (isAdded && ::binding.isInitialized) {
+                                            actualizarTemporizadorUI(segundos)
+                                        }
+                                    },
+                                    onFinish = {
+                                        if (isAdded) {
+                                            manejarTiempoAgotado()
+                                        }
+                                    }
+                                )
+                                temporizadorInicializado = true
+                            }
+                        }
+                    } else {
+                        Log.d("DEBUG_TEMPORIZADOR", "❌ No hay temporizador activo en servidor")
+                        // El servidor debería crear uno automáticamente al cambiar el turno
                     }
-                } catch (e: Exception) {
-                    Log.e("DEBUG_TEMPORIZADOR", "Error mostrando layout: ${e.message}")
                 }
-
-                // Iniciar temporizador UI directamente
-                iniciarTemporizadorUIDirecto()
-
-                // Intentar sincronizar con servidor (sin bloquear la UI)
-                sincronizarConServidorEnSegundoPlano()
-
-                temporizadorInicializado = true
-            } else {
-                Log.d("DEBUG_TEMPORIZADOR", "✅ Temporizador ya inicializado")
             }
         } else {
             Log.d("DEBUG_TEMPORIZADOR", "⏸️ NO es mi turno - Ocultando temporizador")
@@ -734,9 +761,10 @@ class FragmentInicio : Fragment() {
      * ACTUALIZADO: Detener temporizador completamente
      */
     private fun detenerTemporizadorGlobal() {
-        Log.d("TEMPORIZADOR", "🛑 Deteniendo temporizador global")
+        Log.d("TEMPORIZADOR", "🛑 Deteniendo temporizador global completamente")
         detenerTemporizadorUI()
         TemporizadorGlobal.detenerTemporizador()
+        temporizadorInicializado = false
     }
 
 
@@ -745,8 +773,13 @@ class FragmentInicio : Fragment() {
      */
     private fun ocultarTemporizador() {
         try {
+            // Solo ocultar UI y desregistrar callbacks
+            if (::binding.isInitialized) {
+                binding.layoutTemporizador.visibility = View.GONE
+            }
             detenerTemporizadorUI()
             TemporizadorGlobal.desregistrarCallbacks()
+            // NO llamar a detenerTemporizador() aquí
         } catch (e: Exception) {
             Log.w("TEMPORIZADOR", "Error ocultando temporizador: ${e.message}")
         }
@@ -1423,12 +1456,12 @@ class FragmentInicio : Fragment() {
             navegarAFragmentMiEquipo(tipo, jugadores)
         }
     }
-    /**
-     * NUEVO: Guarda el lineup con información del draft
-     */
     private fun guardarLineupSeleccionadoDraft(equipoId: String, tipo: String, jugadores: Map<String, Map<String, Any>>) {
         val database = FirebaseDatabase.getInstance()
         val lineupsRef = database.getReference("LineupsSeleccionados")
+
+        // NUEVO: Calcular rating promedio antes de guardar
+        val ratingPromedio = RatingCalculator.calcularRatingPromedioDesdeMap(jugadores)
 
         val lineupSeleccionado = LineupSeleccionado(
             equipoId = equipoId,
@@ -1439,14 +1472,15 @@ class FragmentInicio : Fragment() {
             fechaSeleccion = System.currentTimeMillis(),
             jugadores = jugadores,
             ronda = estadoDraftActual.rondaActual,
-            turno = estadoDraftActual.turnoActual
+            turno = estadoDraftActual.turnoActual,
+            ratingPromedio = ratingPromedio  // NUEVO: Agregar rating promedio
         )
 
         val claveLineup = "${equipoId}_${tipo}"
 
         lineupsRef.child(claveLineup).setValue(lineupSeleccionado)
             .addOnSuccessListener {
-                Log.d("LINEUP_GUARDADO", "Lineup guardado exitosamente: $claveLineup para usuario $idGamingUsuarioActual en ronda ${estadoDraftActual.rondaActual}")
+                Log.d("LINEUP_GUARDADO", "Lineup guardado exitosamente: $claveLineup para usuario $idGamingUsuarioActual en ronda ${estadoDraftActual.rondaActual} con rating $ratingPromedio")
             }
             .addOnFailureListener { error ->
                 Log.e("LINEUP_ERROR", "Error al guardar lineup: ${error.message}")
@@ -1488,27 +1522,22 @@ class FragmentInicio : Fragment() {
      */
     override fun onDestroyView() {
         super.onDestroyView()
+        Log.d("LIFECYCLE", "FragmentInicio - onDestroyView")
 
-        Log.d("FRAGMENT_LIFECYCLE", "💀 FragmentInicio - onDestroyView")
-
-        // Solo limpiar recursos locales, NO detener temporizador global
-        detenerTemporizadorUI()
+        // Solo desregistrar callbacks, el temporizador global continúa
         TemporizadorGlobal.desregistrarCallbacks()
 
-        // Limpiar listeners de Firebase
+        // Limpiar UI local
+        detenerTemporizadorUI()
+
+        // Limpiar listeners
         lineupsListener?.let {
             FirebaseDatabase.getInstance().getReference("LineupsSeleccionados").removeEventListener(it)
         }
+
         ligasListener?.let {
             FirebaseDatabase.getInstance().getReference("Ligas").removeEventListener(it)
         }
-
-        controladorDraft = null
-
-        // IMPORTANTE: NO resetear temporizadorInicializado aquí
-        // Se resetea solo cuando el usuario hace una selección
-
-        Log.d("FRAGMENT_LIFECYCLE", "FragmentInicio destruido, listeners limpiados")
     }
 
     /**
@@ -1516,20 +1545,11 @@ class FragmentInicio : Fragment() {
      */
     override fun onResume() {
         super.onResume()
-        Log.d("FRAGMENT_LIFECYCLE", "📱 FragmentInicio - onResume")
+        Log.d("LIFECYCLE", "FragmentInicio - onResume")
 
-        // NUEVO: Solo reconectar el temporizador si ya estaba inicializado
-        if (temporizadorInicializado && !esVisiblePorPrimeraVez) {
-            Log.d("FRAGMENT_LIFECYCLE", "🔄 Reconectando temporizador existente")
-
-            // Pequeño delay para asegurar que la UI esté lista
-            Handler(Looper.getMainLooper()).postDelayed({
-                reconectarTemporizador()
-            }, 200)
-
-        } else {
-            Log.d("FRAGMENT_LIFECYCLE", "⏳ Primera vez visible o temporizador no inicializado")
-            esVisiblePorPrimeraVez = false
+        // Re-verificar si hay un temporizador activo al volver
+        if (estadoDraftActual.draftIniciado && !estadoDraftActual.draftCompletado) {
+            verificarYActivarTemporizador()
         }
     }
     /**
@@ -1537,12 +1557,12 @@ class FragmentInicio : Fragment() {
      */
     override fun onPause() {
         super.onPause()
-        Log.d("FRAGMENT_LIFECYCLE", "⏸️ FragmentInicio - onPause")
+        Log.d("LIFECYCLE", "FragmentInicio - onPause")
 
-        // IMPORTANTE: Solo desregistrar callbacks, NO detener el temporizador
+        // Solo desregistrar callbacks, NO detener el temporizador
         TemporizadorGlobal.desregistrarCallbacks()
 
-        // Detener temporizador UI local (visual)
+        // Detener solo el temporizador UI local
         temporizadorUI?.cancel()
     }
 
