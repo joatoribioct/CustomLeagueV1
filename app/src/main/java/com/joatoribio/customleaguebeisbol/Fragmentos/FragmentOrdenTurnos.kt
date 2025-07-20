@@ -315,53 +315,40 @@ class FragmentOrdenTurnos : Fragment() {
     }
 
     private fun iniciarDraft() {
+        val database = FirebaseDatabase.getInstance()
+        val configuracionRef = database.getReference("Ligas/${ligaActual?.id}/configuracion/configuracionDraft")
+
         ligaActual?.let { liga ->
-            val database = FirebaseDatabase.getInstance()
-            val ligaRef = database.getReference("Ligas").child(liga.id)
-
-            val configuracionDraft = liga.configuracion.configuracionDraft
-
-            val updates = if (configuracionDraft.draftCompletado) {
-                Toast.makeText(mContexto, "⚠️ El draft ya está completado. No se puede reiniciar.", Toast.LENGTH_LONG).show()
-                return
+            // Obtener el primer usuario según el orden de turnos
+            val primerUsuario = if (liga.configuracion.configuracionDraft.ordenTurnos.isNotEmpty()) {
+                liga.configuracion.configuracionDraft.ordenTurnos[0]
+            } else if (liga.usuariosParticipantes.isNotEmpty()) {
+                liga.usuariosParticipantes[0].uid
             } else {
-                val rondaActual = if (configuracionDraft.rondaActual > 0) {
-                    configuracionDraft.rondaActual
-                } else {
-                    1
-                }
-
-                val turnoActual = configuracionDraft.turnoActual
-
-                Log.d("DRAFT_RESTART", "Reanudando draft desde: Ronda $rondaActual, Turno $turnoActual")
-
-                mapOf(
-                    "configuracion/configuracionDraft/draftIniciado" to true,
-                    "configuracion/configuracionDraft/draftCompletado" to false,
-                    "configuracion/configuracionDraft/rondaActual" to rondaActual,
-                    "configuracion/configuracionDraft/turnoActual" to turnoActual,
-                    "configuracion/configuracionDraft/fechaInicio" to (
-                            if (configuracionDraft.fechaInicio > 0) configuracionDraft.fechaInicio
-                            else System.currentTimeMillis()
-                            ),
-                    "configuracion/configuracionDraft/fechaDetencion" to 0,
-                    "estado" to "EnProgreso"
-                )
+                Log.e("DRAFT", "No hay usuarios para iniciar el draft")
+                return
             }
 
-            ligaRef.updateChildren(updates)
-                .addOnSuccessListener {
-                    val mensaje = if (configuracionDraft.rondaActual > 1 || configuracionDraft.turnoActual > 0) {
-                        "🔄 Draft reanudado desde Ronda ${configuracionDraft.rondaActual}, Turno ${configuracionDraft.turnoActual + 1}"
-                    } else {
-                        "🚀 Draft iniciado exitosamente\n\n¡El primer participante puede comenzar a seleccionar!"
-                    }
+            Log.d("DRAFT", "Iniciando draft con primer usuario: $primerUsuario")
 
-                    Toast.makeText(mContexto, mensaje, Toast.LENGTH_LONG).show()
-                    cargarLigaDelUsuario()
+            val updates = mapOf(
+                "draftIniciado" to true,
+                "fechaInicio" to System.currentTimeMillis(),
+                "usuarioEnTurno" to primerUsuario  // IMPORTANTE: Establecer el primer usuario
+            )
+
+            configuracionRef.updateChildren(updates)
+                .addOnSuccessListener {
+                    Toast.makeText(mContexto, "¡Draft iniciado! 🎯", Toast.LENGTH_SHORT).show()
+                    Log.d("DRAFT", "✅ Draft iniciado exitosamente")
+                    Log.d("DRAFT", "   - Primer usuario en turno: $primerUsuario")
+
+                    // Notificar a todos los participantes (si tienes esta función implementada)
+                    // enviarNotificacionInicioLiga(liga.nombre)
                 }
                 .addOnFailureListener { error ->
-                    Toast.makeText(mContexto, "Error al iniciar/reanudar draft: ${error.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(mContexto, "Error al iniciar draft: ${error.message}", Toast.LENGTH_SHORT).show()
+                    Log.e("DRAFT", "Error iniciando draft: ${error.message}")
                 }
         }
     }

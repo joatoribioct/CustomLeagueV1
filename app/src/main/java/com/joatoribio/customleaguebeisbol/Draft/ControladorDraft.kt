@@ -151,37 +151,60 @@ class ControladorDraft(
 
     /**
      * Actualiza el estado del draft en Firebase
+     * IMPORTANTE: Ahora también actualiza usuarioEnTurno para activar el trigger
      */
     private fun actualizarEstadoDraft(ronda: Int, turno: Int) {
         Log.d("DRAFT_CONTROLLER", "Actualizando estado: ronda=$ronda, turno=$turno")
 
+        // Los participantes son una lista de String (UIDs)
+        val usuarioEnTurno = if (turno < participantes.size) {
+            participantes[turno]  // Ya es un String (UID)
+        } else {
+            Log.e("DRAFT_CONTROLLER", "Error: turno $turno fuera de rango (${participantes.size} participantes)")
+            return
+        }
+
+        Log.d("DRAFT_CONTROLLER", "📝 Nuevo usuario en turno: $usuarioEnTurno")
+
+        // IMPORTANTE: Actualizar TODO incluyendo usuarioEnTurno
         val updates = mapOf(
             "rondaActual" to ronda,
             "turnoActual" to turno,
+            "usuarioEnTurno" to usuarioEnTurno,  // ESTO ES LO QUE FALTABA
             "ultimaActualizacion" to System.currentTimeMillis()
         )
 
         draftRef.updateChildren(updates)
             .addOnSuccessListener {
-                Log.d("DRAFT_CONTROLLER", "Estado actualizado exitosamente")
+                Log.d("DRAFT_CONTROLLER", "✅ Estado actualizado exitosamente")
+                Log.d("DRAFT_CONTROLLER", "   - Ronda: $ronda")
+                Log.d("DRAFT_CONTROLLER", "   - Turno: $turno")
+                Log.d("DRAFT_CONTROLLER", "   - Usuario en turno: $usuarioEnTurno")
             }
             .addOnFailureListener { error ->
-                Log.e("DRAFT_CONTROLLER", "Error al actualizar estado: ${error.message}")
+                Log.e("DRAFT_CONTROLLER", "❌ Error al actualizar estado: ${error.message}")
             }
     }
 
     /**
-     * Completa el draft
+     * También corregir la función de completar draft
      */
     private fun completarDraft() {
         Log.d("DRAFT_CONTROLLER", "Completando draft")
 
         val updates = mapOf(
             "draftCompletado" to true,
-            "fechaFinalizacion" to System.currentTimeMillis()
+            "fechaFinalizacion" to System.currentTimeMillis(),
+            "usuarioEnTurno" to ""  // Limpiar usuario en turno al completar
         )
 
         draftRef.updateChildren(updates)
+            .addOnSuccessListener {
+                Log.d("DRAFT_CONTROLLER", "✅ Draft completado exitosamente")
+            }
+            .addOnFailureListener { error ->
+                Log.e("DRAFT_CONTROLLER", "❌ Error completando draft: ${error.message}")
+            }
     }
 
     /**
